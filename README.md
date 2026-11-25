@@ -1,17 +1,6 @@
 <div align="center">
   <img src="assets/hero.svg" alt="oplog-stream" width="100%"/>
-</div>
-
-<br/>
-
-<div align="center">
-
-![Python](https://img.shields.io/badge/Python-3.13-1F9E5A?style=flat-square)
-![MongoDB Atlas](https://img.shields.io/badge/MongoDB_Atlas-M0_·_8.0-1F9E5A?style=flat-square)
-![PyMongo](https://img.shields.io/badge/PyMongo-4.7.3-3D7FE0?style=flat-square)
-![Sessions](https://img.shields.io/badge/Concurrent_sessions-20-14201B?style=flat-square)
-![Written](https://img.shields.io/badge/Documents_written-19%2C978-14201B?style=flat-square)
-
+  <img src="assets/stack-strip.svg" alt="Python 3.13 · MongoDB Atlas M0 8.0 · PyMongo 4.7.3 · 20 sessions · 19,978 documents written" width="100%"/>
 </div>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
@@ -233,6 +222,7 @@ oplog-stream/
 ├── generate_banner.py    banner
 ├── generate_headers.py   section heading strips
 ├── generate_architecture.py  architecture diagram
+├── generate_stats_strip.py   stack and run figures strip
 ├── mosaic.py             pixel-mosaic arch shared by banner and strips
 ├── svg_theme.py          palette and embedded Instrument Sans
 ├── results/              raw data from the recorded run
