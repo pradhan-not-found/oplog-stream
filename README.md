@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/hero.svg" alt="oplog-stream" width="100%"/>
-  <img src="assets/stack-strip.svg" alt="Python 3.13 · MongoDB Atlas M0 8.0 · PyMongo 4.7.3 · 20 sessions · 19,978 documents written" width="100%"/>
+  <img src="assets/stack-bar.svg" alt="Python 3.13 · MongoDB Atlas M0 8.0 · PyMongo 4.7.3 · 20 sessions · 19,978 documents written" width="100%"/>
 </div>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>

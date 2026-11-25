@@ -1,7 +1,7 @@
 """
 generate_stats_strip.py
 Python and MongoDB marks: Simple Icons (CC0 1.0), https://simpleicons.org
-Renders assets/stack-strip.svg: the stack and headline run figures as one
+Renders assets/stack-bar.svg: the stack and headline run figures as one
 image strip that sits under the banner (replaces shield badges).
 
 Run: python generate_stats_strip.py
@@ -82,5 +82,5 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{
   {''.join(parts)}
 </svg>
 """
-(ROOT / "assets" / "stack-strip.svg").write_text(svg, encoding="utf-8")
-print("[OK] assets/stack-strip.svg")
+(ROOT / "assets" / "stack-bar.svg").write_text(svg, encoding="utf-8")
+print("[OK] assets/stack-bar.svg")
