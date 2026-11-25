@@ -3,15 +3,12 @@
 </div>
 
 <p align="center">
-  <img src="assets/logos/python.svg" height="18" alt="Python" align="absmiddle"/>&nbsp; <b>Python 3.13</b>
-  &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
-  <img src="assets/logos/mongodb.svg" height="18" alt="MongoDB" align="absmiddle"/>&nbsp; <b>MongoDB Atlas</b> M0 · 8.0
-  &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
-  <img src="assets/logos/pymongo.svg" height="18" alt="PyMongo" align="absmiddle"/>&nbsp; <b>PyMongo 4.7.3</b>
-</p>
-
-<p align="center">
-  <sub>20 concurrent sessions &nbsp;·&nbsp; 19,978 documents written &nbsp;·&nbsp; 0.11% write errors &nbsp;·&nbsp; insert p50 107.5&nbsp;ms</sub>
+  <img src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.13"/>
+  <img src="https://img.shields.io/badge/MongoDB_Atlas-M0_·_8.0-47A248?style=flat-square&logo=mongodb&logoColor=white" alt="MongoDB Atlas M0 8.0"/>
+  <img src="https://img.shields.io/badge/PyMongo-4.7.3-13AA52?style=flat-square&logo=mongodb&logoColor=white" alt="PyMongo 4.7.3"/>
+  <img src="https://img.shields.io/badge/Sessions-20-1C2D38?style=flat-square" alt="20 sessions"/>
+  <img src="https://img.shields.io/badge/Documents_written-19%2C978-1C2D38?style=flat-square" alt="19,978 documents written"/>
+  <img src="https://img.shields.io/badge/Insert_p50-107.5_ms-1C2D38?style=flat-square" alt="Insert p50 107.5 ms"/>
 </p>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
@@ -233,7 +230,6 @@ oplog-stream/
 ├── generate_banner.py    banner
 ├── generate_headers.py   section heading strips
 ├── generate_architecture.py  architecture diagram
-├── generate_logos.py     tech logos for the header row
 ├── mosaic.py             pixel-mosaic arch shared by banner and strips
 ├── svg_theme.py          palette and embedded Instrument Sans
 ├── results/              raw data from the recorded run
