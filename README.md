@@ -19,48 +19,51 @@ Every chart and number in this README comes from one recorded run on 25 November
 
 <img src="assets/architecture-overview.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
 
-| Component | Role |
-|:--|:--|
-| `push_script.py` | Generates one 20-variable document per loop iteration and inserts it with `insert_one`. Records the latency of every acknowledged insert. |
-| `launch_sessions.py` | Starts 20 `push_script.py` processes, each with its own `MongoClient`. |
-| `pull_script.py` | Separate consumer. Polls `find({_id: {$gt: bookmark}}).sort({_id: 1}).limit(100)` and records every poll. |
-| `atlas_monitor.py` | Samples `serverStatus` every second, tails the oplog through a change stream, and reads replica-set heartbeats for replication lag. |
-| `oplog_replay.py` | After the run, opens a change stream at the run's start time and re-reads every oplog entry for the namespace. |
-| `run_simulation.py` | Runs all of the above in order: a 30 s idle baseline, the push phase, then a 30 s cooldown. |
+<table width="100%">
+  <tr><th width="50%" align="left">Component</th><th width="50%" align="left">Role</th></tr>
+  <tr><td align="left"><code>push_script.py</code></td><td align="left">Generates one 20-variable document per loop iteration and inserts it with <code>insert_one</code>. Records the latency of every acknowledged insert.</td></tr>
+  <tr><td align="left"><code>launch_sessions.py</code></td><td align="left">Starts 20 <code>push_script.py</code> processes, each with its own <code>MongoClient</code>.</td></tr>
+  <tr><td align="left"><code>pull_script.py</code></td><td align="left">Separate consumer. Polls <code>find({_id: {$gt: bookmark}}).sort({_id: 1}).limit(100)</code> and records every poll.</td></tr>
+  <tr><td align="left"><code>atlas_monitor.py</code></td><td align="left">Samples <code>serverStatus</code> every second, tails the oplog through a change stream, and reads replica-set heartbeats for replication lag.</td></tr>
+  <tr><td align="left"><code>oplog_replay.py</code></td><td align="left">After the run, opens a change stream at the run's start time and re-reads every oplog entry for the namespace.</td></tr>
+  <tr><td align="left"><code>run_simulation.py</code></td><td align="left">Runs all of the above in order: a 30 s idle baseline, the push phase, then a 30 s cooldown.</td></tr>
+</table>
 
 <img src="assets/section_report.svg" alt="Simulation report" width="100%"/>
 
 ### Test parameters
 
-| Parameter | Value |
-|:--|:--|
-| Cluster | MongoDB Atlas M0 (free tier), MongoDB 8.0, AWS, 3-node replica set |
-| Client | Python 3.13.14, PyMongo 4.7.3, Windows 11, one home broadband link |
-| Producers | 20 processes × 1,000 documents, 100 ms sleep between inserts |
-| Write concern | `w: majority` (from the connection string) |
-| Consumer | 1 process, batch 100, 1 s poll interval |
-| Run window | 06:04:40 to 06:14:51 UTC (push phase 549.6 s) |
+<table width="100%">
+  <tr><th width="50%" align="left">Parameter</th><th width="50%" align="left">Value</th></tr>
+  <tr><td align="left">Cluster</td><td align="left">MongoDB Atlas M0 (free tier), MongoDB 8.0, AWS, 3-node replica set</td></tr>
+  <tr><td align="left">Client</td><td align="left">Python 3.13.14, PyMongo 4.7.3, Windows 11, one home broadband link</td></tr>
+  <tr><td align="left">Producers</td><td align="left">20 processes × 1,000 documents, 100 ms sleep between inserts</td></tr>
+  <tr><td align="left">Write concern</td><td align="left"><code>w: majority</code> (from the connection string)</td></tr>
+  <tr><td align="left">Consumer</td><td align="left">1 process, batch 100, 1 s poll interval</td></tr>
+  <tr><td align="left">Run window</td><td align="left">06:04:40 to 06:14:51 UTC (push phase 549.6 s)</td></tr>
+</table>
 
 ### Results
 
-| Metric | Result |
-|:--|--:|
-| Documents attempted | 20,000 |
-| Acknowledged inserts | **19,978** (99.89%) |
-| Failed inserts | **22** (0.11%): connection resets (`WinError 10054`) and timeouts |
-| Oplog insert entries for the run, replayed from `local.oplog.rs` | **19,978**, exactly equal to the acknowledged inserts |
-| Documents per session in the oplog | 999 for 18 sessions, 998 for 2 sessions |
-| Steady insert rate (`serverStatus.opcounters.insert`) | 45.8 ops/s |
-| Peak insert rate | 90 ops/s (1 s sample), 64 ops/s (5 s average) |
-| `insert_one` latency, p50 (median across sessions) | **107.5 ms** (92.8 to 121.1 ms by session) |
-| `insert_one` latency, p95 | 702 to 821 ms by session |
-| `insert_one` latency, max | 27.0 s, during a network outage |
-| Connections on the primary | 43 at baseline, 204 at peak |
-| Periods with no committed writes during the push phase | 5, totalling 84 s |
-| Documents seen by the pull consumer | **15,943 of 19,978 (79.8%)** |
-| Pull query time, p50 / p95 | 265 ms / 1,529 ms |
-| End-to-end delay (push → pull), p50 / p95 | 1.05 s / 39.7 s |
-| Status distribution vs. generator weights | within 0.41 percentage points for every value |
+<table width="100%">
+  <tr><th width="50%" align="left">Metric</th><th width="50%" align="right">Result</th></tr>
+  <tr><td align="left">Documents attempted</td><td align="right">20,000</td></tr>
+  <tr><td align="left">Acknowledged inserts</td><td align="right"><b>19,978</b> (99.89%)</td></tr>
+  <tr><td align="left">Failed inserts</td><td align="right"><b>22</b> (0.11%): connection resets (<code>WinError 10054</code>) and timeouts</td></tr>
+  <tr><td align="left">Oplog insert entries for the run, replayed from <code>local.oplog.rs</code></td><td align="right"><b>19,978</b>, exactly equal to the acknowledged inserts</td></tr>
+  <tr><td align="left">Documents per session in the oplog</td><td align="right">999 for 18 sessions, 998 for 2 sessions</td></tr>
+  <tr><td align="left">Steady insert rate (<code>serverStatus.opcounters.insert</code>)</td><td align="right">45.8 ops/s</td></tr>
+  <tr><td align="left">Peak insert rate</td><td align="right">90 ops/s (1 s sample), 64 ops/s (5 s average)</td></tr>
+  <tr><td align="left"><code>insert_one</code> latency, p50 (median across sessions)</td><td align="right"><b>107.5 ms</b> (92.8 to 121.1 ms by session)</td></tr>
+  <tr><td align="left"><code>insert_one</code> latency, p95</td><td align="right">702 to 821 ms by session</td></tr>
+  <tr><td align="left"><code>insert_one</code> latency, max</td><td align="right">27.0 s, during a network outage</td></tr>
+  <tr><td align="left">Connections on the primary</td><td align="right">43 at baseline, 204 at peak</td></tr>
+  <tr><td align="left">Periods with no committed writes during the push phase</td><td align="right">5, totalling 84 s</td></tr>
+  <tr><td align="left">Documents seen by the pull consumer</td><td align="right"><b>15,943 of 19,978 (79.8%)</b></td></tr>
+  <tr><td align="left">Pull query time, p50 / p95</td><td align="right">265 ms / 1,529 ms</td></tr>
+  <tr><td align="left">End-to-end delay (push → pull), p50 / p95</td><td align="right">1.05 s / 39.7 s</td></tr>
+  <tr><td align="left">Status distribution vs. generator weights</td><td align="right">within 0.41 percentage points for every value</td></tr>
+</table>
 
 > [!IMPORTANT]
 > The bookmark consumer missed 20.2% of the documents, even though every one of them was committed and is in the oplog. The cause is explained in [finding 1](#finding-1-polling-on-_id-loses-documents-under-concurrent-producers).
@@ -121,15 +124,16 @@ All 20 sessions behaved the same way: p50 between 93 and 121 ms, p95 between 702
 
 <img src="assets/charts/status_dist.svg" width="100%" alt="status field distribution"/>
 
-| Field | Expected mean | Observed mean |
-|:--|--:|--:|
-| `temperature` | 37.50 °C | 37.44 °C |
-| `humidity` | 55.00 % | 54.76 % |
-| `pressure` | 1,000.00 hPa | 1,000.19 hPa |
-| `voltage` | 4.000 V | 4.007 V |
-| `cpu_usage` | 50.00 % | 50.25 % |
-| `latency_ms` | 250.50 ms | 248.73 ms |
-| `signal_strength` | −65.0 dBm | −65.07 dBm |
+<table width="100%">
+  <tr><th width="33%" align="left">Field</th><th width="33%" align="right">Expected mean</th><th width="33%" align="right">Observed mean</th></tr>
+  <tr><td align="left"><code>temperature</code></td><td align="right">37.50 °C</td><td align="right">37.44 °C</td></tr>
+  <tr><td align="left"><code>humidity</code></td><td align="right">55.00 %</td><td align="right">54.76 %</td></tr>
+  <tr><td align="left"><code>pressure</code></td><td align="right">1,000.00 hPa</td><td align="right">1,000.19 hPa</td></tr>
+  <tr><td align="left"><code>voltage</code></td><td align="right">4.000 V</td><td align="right">4.007 V</td></tr>
+  <tr><td align="left"><code>cpu_usage</code></td><td align="right">50.00 %</td><td align="right">50.25 %</td></tr>
+  <tr><td align="left"><code>latency_ms</code></td><td align="right">250.50 ms</td><td align="right">248.73 ms</td></tr>
+  <tr><td align="left"><code>signal_strength</code></td><td align="right">−65.0 dBm</td><td align="right">−65.07 dBm</td></tr>
+</table>
 
 These means come from the 15,943 documents the consumer received. They match the generator's distributions, so the documents arrive intact. The missing 20% is a delivery problem, not a data problem.
 
@@ -191,28 +195,29 @@ python oplog_replay.py && python generate_graphs.py         # report
 
 Each document has 3 metadata fields (`event_id`, `timestamp`, `pushed_at_epoch`) and 20 generated variables:
 
-| # | Field | Type | Range / values |
-|:-:|:--|:--|:--|
-| 1 | `session_id` | int | 1 – 20 |
-| 2 | `sequence` | int | 1 – 1,000 per session |
-| 3 | `device_id` | string | `dev-{session:02d}-{seq:06d}` |
-| 4 | `device_type` | string | sensor, gateway, edge_node, controller, actuator |
-| 5 | `region` | string | us-east-1, eu-west-1, ap-south-1, us-west-2, sa-east-1 |
-| 6 | `temperature` | float | −10.0 to 85.0 °C |
-| 7 | `humidity` | float | 10.0 to 100.0 % |
-| 8 | `pressure` | float | 950.0 to 1050.0 hPa |
-| 9 | `voltage` | float | 3.000 to 5.000 V |
-| 10 | `current` | float | 0.050 to 2.500 A |
-| 11 | `cpu_usage` | float | 0.0 to 100.0 % |
-| 12 | `memory_usage` | float | 0.0 to 100.0 % |
-| 13 | `disk_usage` | float | 0.0 to 100.0 % |
-| 14 | `packet_loss` | float | 0.00 to 10.00 % |
-| 15 | `latency_ms` | float | 1.0 to 500.0 ms |
-| 16 | `signal_strength` | int | −100 to −30 dBm |
-| 17 | `error_code` | int | 0, 1, 2, 3, 404, 500, 503 |
-| 18 | `protocol` | string | MQTT, CoAP, HTTP, WebSocket, AMQP |
-| 19 | `payload_size_kb` | float | 0.10 to 64.00 KB |
-| 20 | `status` | string | OK 70%, WARNING 15%, CRITICAL 10%, UNKNOWN 5% |
+<table width="100%">
+  <tr><th width="6%" align="center">#</th><th width="31%" align="left">Field</th><th width="31%" align="left">Type</th><th width="31%" align="left">Range / values</th></tr>
+  <tr><td align="left">1</td><td align="left"><code>session_id</code></td><td align="left">int</td><td align="left">1 – 20</td></tr>
+  <tr><td align="left">2</td><td align="left"><code>sequence</code></td><td align="left">int</td><td align="left">1 – 1,000 per session</td></tr>
+  <tr><td align="left">3</td><td align="left"><code>device_id</code></td><td align="left">string</td><td align="left"><code>dev-{session:02d}-{seq:06d}</code></td></tr>
+  <tr><td align="left">4</td><td align="left"><code>device_type</code></td><td align="left">string</td><td align="left">sensor, gateway, edge_node, controller, actuator</td></tr>
+  <tr><td align="left">5</td><td align="left"><code>region</code></td><td align="left">string</td><td align="left">us-east-1, eu-west-1, ap-south-1, us-west-2, sa-east-1</td></tr>
+  <tr><td align="left">6</td><td align="left"><code>temperature</code></td><td align="left">float</td><td align="left">−10.0 to 85.0 °C</td></tr>
+  <tr><td align="left">7</td><td align="left"><code>humidity</code></td><td align="left">float</td><td align="left">10.0 to 100.0 %</td></tr>
+  <tr><td align="left">8</td><td align="left"><code>pressure</code></td><td align="left">float</td><td align="left">950.0 to 1050.0 hPa</td></tr>
+  <tr><td align="left">9</td><td align="left"><code>voltage</code></td><td align="left">float</td><td align="left">3.000 to 5.000 V</td></tr>
+  <tr><td align="left">10</td><td align="left"><code>current</code></td><td align="left">float</td><td align="left">0.050 to 2.500 A</td></tr>
+  <tr><td align="left">11</td><td align="left"><code>cpu_usage</code></td><td align="left">float</td><td align="left">0.0 to 100.0 %</td></tr>
+  <tr><td align="left">12</td><td align="left"><code>memory_usage</code></td><td align="left">float</td><td align="left">0.0 to 100.0 %</td></tr>
+  <tr><td align="left">13</td><td align="left"><code>disk_usage</code></td><td align="left">float</td><td align="left">0.0 to 100.0 %</td></tr>
+  <tr><td align="left">14</td><td align="left"><code>packet_loss</code></td><td align="left">float</td><td align="left">0.00 to 10.00 %</td></tr>
+  <tr><td align="left">15</td><td align="left"><code>latency_ms</code></td><td align="left">float</td><td align="left">1.0 to 500.0 ms</td></tr>
+  <tr><td align="left">16</td><td align="left"><code>signal_strength</code></td><td align="left">int</td><td align="left">−100 to −30 dBm</td></tr>
+  <tr><td align="left">17</td><td align="left"><code>error_code</code></td><td align="left">int</td><td align="left">0, 1, 2, 3, 404, 500, 503</td></tr>
+  <tr><td align="left">18</td><td align="left"><code>protocol</code></td><td align="left">string</td><td align="left">MQTT, CoAP, HTTP, WebSocket, AMQP</td></tr>
+  <tr><td align="left">19</td><td align="left"><code>payload_size_kb</code></td><td align="left">float</td><td align="left">0.10 to 64.00 KB</td></tr>
+  <tr><td align="left">20</td><td align="left"><code>status</code></td><td align="left">string</td><td align="left">OK 70%, WARNING 15%, CRITICAL 10%, UNKNOWN 5%</td></tr>
+</table>
 
 <img src="assets/section_layout.svg" alt="Repository layout" width="100%"/>
 
