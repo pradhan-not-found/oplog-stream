@@ -7,8 +7,7 @@
   <img src="https://img.shields.io/badge/MongoDB_Atlas-M0_·_8.0-47A248?style=flat-square&logo=mongodb&logoColor=white" alt="MongoDB Atlas M0 8.0"/>
   <img src="https://img.shields.io/badge/PyMongo-4.7.3-13AA52?style=flat-square&logo=mongodb&logoColor=white" alt="PyMongo 4.7.3"/>
   <img src="https://img.shields.io/badge/Sessions-20-1C2D38?style=flat-square" alt="20 sessions"/>
-  <img src="https://img.shields.io/badge/Documents_written-19%2C978-1C2D38?style=flat-square" alt="19,978 documents written"/>
-  <img src="https://img.shields.io/badge/Insert_p50-107.5_ms-1C2D38?style=flat-square" alt="Insert p50 107.5 ms"/>
+  <img src="https://img.shields.io/badge/Documents-19%2C978-1C2D38?style=flat-square" alt="19,978 documents"/>
 </p>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
