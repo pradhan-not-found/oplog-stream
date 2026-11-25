@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 230">
+  <rect width="760" height="230" fill="#0d1627" rx="10"/>
+  <rect x="1" y="1" width="758" height="228" fill="none" stroke="#1e2f52" stroke-width="1" rx="10"/>
+  <text x="58" y="16" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="13" font-weight="600" fill="#e8f0ff">Status Distribution — 20,000 Documents</text>
+  
+  <line x1="58" y1="158.0" x2="742" y2="158.0" stroke="#1a2744" stroke-width="1"/>
+  <text x="52" y="162.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">3,510</text>
+  <line x1="58" y1="124.0" x2="742" y2="124.0" stroke="#1a2744" stroke-width="1"/>
+  <text x="52" y="128.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">7,021</text>
+  <line x1="58" y1="90.0" x2="742" y2="90.0" stroke="#1a2744" stroke-width="1"/>
+  <text x="52" y="94.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">10,532</text>
+  <line x1="58" y1="56.0" x2="742" y2="56.0" stroke="#1a2744" stroke-width="1"/>
+  <text x="52" y="60.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">14,043</text>
+  <line x1="58" y1="36" x2="58" y2="192" stroke="#1e2f52" stroke-width="1"/>
+  <line x1="58" y1="192" x2="742" y2="192" stroke="#1e2f52" stroke-width="1"/>
+  <rect x="106" y="56.0" width="110" height="136.0" fill="#00ed64" opacity="0.85" rx="4"/>
+  <text x="161.0" y="48.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#00ed64" text-anchor="middle" font-weight="600">70.2%</text>
+  <text x="161.0" y="36.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">14,043</text>
+  <text x="161.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">OK</text>
+  <rect x="252" y="163.2" width="110" height="28.8" fill="#ff9f43" opacity="0.85" rx="4"/>
+  <text x="307.0" y="155.2" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#ff9f43" text-anchor="middle" font-weight="600">14.9%</text>
+  <text x="307.0" y="143.2" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">2,978</text>
+  <text x="307.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">WARNING</text>
+  <rect x="398" y="172.4" width="110" height="19.6" fill="#ff6b6b" opacity="0.85" rx="4"/>
+  <text x="453.0" y="164.4" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#ff6b6b" text-anchor="middle" font-weight="600">10.1%</text>
+  <text x="453.0" y="152.4" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">2,019</text>
+  <text x="453.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">CRITICAL</text>
+  <rect x="544" y="182.7" width="110" height="9.3" fill="#4a6080" opacity="0.85" rx="4"/>
+  <text x="599.0" y="174.7" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#4a6080" text-anchor="middle" font-weight="600">4.8%</text>
+  <text x="599.0" y="162.7" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">960</text>
+  <text x="599.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">UNKNOWN</text>
+
+</svg>
