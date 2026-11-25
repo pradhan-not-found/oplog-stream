@@ -190,7 +190,7 @@ python atlas_monitor.py --until-idle 30                     # observer
 python oplog_replay.py && python generate_graphs.py         # report
 ```
 
-`generate_banner.py`, `generate_headers.py` and `generate_architecture.py` rebuild the banner, the section strips and the architecture diagram. Instrument Sans (SIL Open Font License) is embedded in every SVG as a subset WOFF2, so the typography renders the same on GitHub.
+`generate_banner.py`, `generate_headers.py` and `generate_architecture.py` rebuild the banner, the section strips and the architecture diagram. Instrument Sans (SIL Open Font License) is embedded in every SVG as a subset WOFF2, so the typography renders the same on GitHub. To regenerate with the font, place InstrumentSans-400/500/600.woff2 in `assets/fonts/`; without them the generators fall back to the system sans-serif.
 
 <img src="assets/section_schema.svg" alt="Document schema" width="100%"/>
 
@@ -236,5 +236,5 @@ oplog-stream/
 ├── mosaic.py             pixel-mosaic arch shared by banner and strips
 ├── svg_theme.py          palette and embedded Instrument Sans
 ├── results/              raw data from the recorded run
-└── assets/               banner, section strips, charts, fonts
+└── assets/               banner, section strips, architecture, charts
 ```
