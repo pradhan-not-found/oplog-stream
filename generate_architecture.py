@@ -1,6 +1,6 @@
 """
 generate_architecture.py
-Renders assets/architecture-detail.svg: push environment -> Atlas replica set ->
+Renders assets/architecture-overview.svg: push environment -> Atlas replica set ->
 pull environment, plus the observer. Grey surface, white cards, Instrument Sans.
 
 Run: python generate_architecture.py
@@ -55,6 +55,19 @@ def arrow(d, color, label="", lx=0, ly=0, dashed=False, anchor="middle"):
     return s
 
 
+def tiles(x, y, width, items, fill, stroke, h=68, gap=10):
+    """Button-style stat tiles: value on top, caption below, evenly split."""
+    w = (width - gap * (len(items) - 1)) / len(items)
+    out = ""
+    for i, (value, caption) in enumerate(items):
+        tx = x + i * (w + gap)
+        out += (f'<rect x="{tx:.1f}" y="{y}" width="{w:.1f}" height="{h}" rx="10" fill="{fill}" '
+                f'stroke="{stroke}" stroke-opacity="0.45"/>'
+                f'<text x="{tx + 14:.1f}" y="{y + 32}" font-size="21" font-weight="600" fill="{INK}">{value}</text>'
+                f'<text x="{tx + 14:.1f}" y="{y + 52}" font-size="11.5" fill="{INK_2}">{caption}</text>')
+    return out
+
+
 def marker(color):
     return (f'<marker id="arrow-{color[1:]}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" '
             f'markerHeight="7" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" '
@@ -74,13 +87,8 @@ for i in range(20):
 parts.append(f'<text x="64" y="488" font-size="13" fill="{INK_2}">One MongoClient per process</text>'
              f'<text x="64" y="508" font-size="13" fill="{INK_2}">20-variable document per loop iteration</text>'
              f'<text x="64" y="528" font-size="13" fill="{INK_2}">insert_one, w: majority, 100 ms sleep</text>'
-             f'<line x1="64" y1="556" x2="446" y2="556" stroke="{LINE}"/>'
-             f'<text x="64" y="594" font-size="24" font-weight="600" fill="{INK}">19,978</text>'
-             f'<text x="64" y="616" font-size="12" fill="{INK_3}">acknowledged inserts</text>'
-             f'<text x="230" y="594" font-size="24" font-weight="600" fill="{INK}">107 ms</text>'
-             f'<text x="230" y="616" font-size="12" fill="{INK_3}">insert p50</text>'
-             f'<text x="352" y="594" font-size="24" font-weight="600" fill="{INK}">22</text>'
-             f'<text x="352" y="616" font-size="12" fill="{INK_3}">failed</text>')
+             + tiles(64, 554, 382, [("19,978", "acknowledged"), ("107 ms", "insert p50"), ("22", "failed")],
+                     GREEN_SOFT, GREEN))
 
 # ---- atlas -------------------------------------------------------------------
 parts.append(card(560, 40, 400, 610, "MONGODB ATLAS", "M0 · MongoDB 8.0 · 3-node replica set"))
@@ -91,19 +99,15 @@ parts.append(node(770, 360, 160, 62, "Secondary", "node 02", "#FFFFFF", LINE))
 parts.append(arrow("M760,186 V212", GREEN))
 parts.append(arrow("M700,280 V354", GREY_FLOW, "replicate", 760, 322, dashed=True))
 parts.append(arrow("M820,280 V354", GREY_FLOW, "", dashed=True))
-parts.append(f'<line x1="584" y1="462" x2="936" y2="462" stroke="{LINE}"/>'
-             f'<text x="590" y="494" font-size="13" fill="{INK_2}">Replication lag p50 0 s, p95 1 s</text>'
-             f'<text x="590" y="514" font-size="13" fill="{INK_2}">Connections 43 → 204 at peak (limit 500)</text>'
-             f'<text x="590" y="534" font-size="13" fill="{INK_2}">Steady 46 inserts/s, peak 90/s</text>')
+parts.append(tiles(584, 554, 352, [("46/s", "steady inserts"), ("204", "peak connections"), ("1 s", "lag p95")],
+                   "#F3F4F1", LINE))
 
 # ---- pull + observer -------------------------------------------------------
 parts.append(card(1050, 40, 410, 280, "PULL ENVIRONMENT", "separate process"))
 parts.append(node(1074, 124, 362, 62, "pull_script.py", "find(_id > bookmark).sort(_id).limit(100)", BLUE_SOFT, BLUE, mono=True))
-parts.append(f'<text x="1074" y="232" font-size="24" font-weight="600" fill="{INK}">79.8%</text>'
-             f'<text x="1074" y="254" font-size="12" fill="{INK_3}">of documents received</text>'
-             f'<text x="1220" y="232" font-size="24" font-weight="600" fill="{INK}">1.05 s</text>'
-             f'<text x="1220" y="254" font-size="12" fill="{INK_3}">push → pull p50</text>'
-             f'<text x="1074" y="292" font-size="12.5" fill="{INK_2}">ObjectId order ≠ commit order across 20 clients</text>')
+parts.append(tiles(1074, 202, 362, [("79.8%", "documents received"), ("1.05 s", "push → pull p50")],
+                   BLUE_SOFT, BLUE)
+             + f'<text x="1074" y="296" font-size="12.5" fill="{INK_2}">ObjectId order ≠ commit order across 20 clients</text>')
 
 parts.append(card(1050, 370, 410, 280, "OBSERVER", "metrics and oplog evidence"))
 parts.append(node(1074, 454, 362, 62, "atlas_monitor.py", "serverStatus · change stream · heartbeats, 1 s", "#FFFFFF", LINE, mono=True))
@@ -123,5 +127,5 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{
   {''.join(parts)}
 </svg>
 """
-(ROOT / "assets" / "architecture-detail.svg").write_text(svg, encoding="utf-8")
-print("[OK] assets/architecture-detail.svg")
+(ROOT / "assets" / "architecture-overview.svg").write_text(svg, encoding="utf-8")
+print("[OK] assets/architecture-overview.svg")
