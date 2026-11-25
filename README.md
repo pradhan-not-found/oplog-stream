@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  20 concurrent sessions &nbsp;·&nbsp; 19,978 documents written &nbsp;·&nbsp; 0.11% write errors &nbsp;·&nbsp; insert p50 107.5 ms
+  <sub>20 concurrent sessions &nbsp;·&nbsp; 19,978 documents written &nbsp;·&nbsp; 0.11% write errors &nbsp;·&nbsp; insert p50 107.5&nbsp;ms</sub>
 </p>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
