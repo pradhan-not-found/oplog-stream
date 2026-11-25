@@ -11,7 +11,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 
 <img src="assets/section_architecture.svg" alt="Architecture" width="100%"/>
 
-<img src="assets/architecture-flow.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
+<img src="assets/architecture-pipeline.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
 
 | Component | Role |
 |:--|:--|

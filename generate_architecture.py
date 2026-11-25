@@ -1,107 +1,118 @@
 """
 generate_architecture.py
-Renders assets/architecture-flow.svg: a minimal left-to-right flow
-(20 producers -> Atlas primary + oplog -> pull consumer), with the
-replica set and the observer as secondary paths. Grey surface, Instrument Sans.
+Renders assets/architecture-pipeline.svg: a 3 x 2 grid of identical cards.
+
+  row 1 (data path):     Producers  ->  Atlas primary  ->  Pull consumer
+  row 2 (oplog path):    Secondaries <-  Oplog         ->  Observer
 
 Run: python generate_architecture.py
 """
 from pathlib import Path
 
-from svg_theme import style_block
+from svg_theme import (MONGODB_GREEN, MONGODB_PATH, PYTHON_BLUE, PYTHON_PATH,
+                       style_block)
 
 ROOT = Path(__file__).parent
-W, H = 1500, 560
+W, H = 1500, 470
 BG = "#EDEEEB"
 CARD = "#FFFFFF"
-LINE = "#D9DCD7"
+STROKE = "#DCDFDA"
 INK = "#14201B"
-INK_2 = "#4A5650"
+INK_2 = "#5B6661"
 INK_3 = "#8A948F"
+LINK = "#9AA39E"
+CHIP_GREEN = "#E6F4EC"
+CHIP_BLUE = "#E7EFF8"
+CHIP_GREY = "#F0F1EE"
 GREEN = "#1F9E5A"
-GREEN_SOFT = "#E6F4EC"
-BLUE = "#3D7FE0"
-FLOW = "#A3ABA7"
 
-p = []
-
-
-def label(x, y, text):
-    p.append(f'<text x="{x}" y="{y}" font-size="12" font-weight="600" letter-spacing="1.4" fill="{INK_3}">{text}</text>')
+CW, CH = 330, 116                      # card size
+COLS = [125, 585, 1045]                # card x
+ROWS = [96, 306]                      # card y
+p: list[str] = []
 
 
-def box(x, y, w, h, title, sub, accent=None, fill=CARD):
-    stroke = accent or LINE
-    p.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.2"/>')
-    if accent:
-        p.append(f'<rect x="{x}" y="{y + 14}" width="3" height="{h - 28}" rx="1.5" fill="{accent}"/>')
-    p.append(f'<text x="{x + 22}" y="{y + h / 2 - 3}" font-size="17" font-weight="600" fill="{INK}">{title}</text>')
-    p.append(f'<text x="{x + 22}" y="{y + h / 2 + 18}" font-size="13" fill="{INK_2}">{sub}</text>')
+def glyph(kind: str, x: float, y: float) -> str:
+    """44x44 chip with a 24px icon centred."""
+    chip = {"python": CHIP_BLUE, "mongodb": CHIP_GREEN, "oplog": CHIP_GREEN}.get(kind, CHIP_GREY)
+    out = f'<rect x="{x}" y="{y}" width="44" height="44" rx="11" fill="{chip}"/>'
+    ix, iy = x + 10, y + 10
+    if kind == "python":
+        out += f'<path transform="translate({ix},{iy})" d="{PYTHON_PATH}" fill="{PYTHON_BLUE}"/>'
+    elif kind == "mongodb":
+        out += f'<path transform="translate({ix},{iy})" d="{MONGODB_PATH}" fill="{MONGODB_GREEN}"/>'
+    elif kind == "grid":
+        out += "".join(f'<rect x="{ix + 1 + c * 6}" y="{iy + 1 + r * 6}" width="4.4" height="4.4" rx="0.8" fill="{GREEN}"/>'
+                       for r in range(4) for c in range(4))
+    elif kind == "oplog":  # stacked log lines
+        out += "".join(f'<rect x="{ix + 2}" y="{iy + 3 + i * 6}" width="{20 - (i % 2) * 6}" height="3" rx="1.5" fill="{GREEN}"/>'
+                       for i in range(4))
+    elif kind == "replica":  # two linked nodes
+        out += (f'<circle cx="{ix + 6}" cy="{iy + 12}" r="4.5" fill="none" stroke="{INK_2}" stroke-width="1.8"/>'
+                f'<circle cx="{ix + 18}" cy="{iy + 12}" r="4.5" fill="none" stroke="{INK_2}" stroke-width="1.8"/>'
+                f'<path d="M{ix + 10.5},{iy + 12} H{ix + 13.5}" stroke="{INK_2}" stroke-width="1.8"/>')
+    elif kind == "observer":  # pulse line
+        out += (f'<path d="M{ix},{iy + 13} h5 l3,-7 l4,14 l3,-9 l2,2 h7" fill="none" stroke="{INK_2}" '
+                f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
+    return out
 
 
-def flow(d, color, text="", tx=0, ty=0, dashed=False, anchor="middle"):
-    dash = ' stroke-dasharray="4 5"' if dashed else ""
-    p.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.6"{dash} marker-end="url(#m{color[1:]})"/>')
+def card(col: int, row: int, kind: str, eyebrow: str, title: str, caption: str) -> None:
+    x, y = COLS[col], ROWS[row]
+    p.append(f'<rect x="{x}" y="{y}" width="{CW}" height="{CH}" rx="16" fill="{CARD}" stroke="{STROKE}" filter="url(#lift)"/>')
+    p.append(glyph(kind, x + 24, y + 24))
+    p.append(f'<text x="{x + 84}" y="{y + 38}" font-size="11.5" font-weight="600" letter-spacing="1.3" fill="{INK_3}">{eyebrow}</text>')
+    p.append(f'<text x="{x + 84}" y="{y + 64}" font-size="19" font-weight="500" fill="{INK}">{title}</text>')
+    p.append(f'<text x="{x + 24}" y="{y + 96}" font-size="13.5" fill="{INK_2}">{caption}</text>')
+
+
+def link(x1, y1, x2, y2, text, dashed=False):
+    dash = ' stroke-dasharray="3 5"' if dashed else ""
+    p.append(f'<path d="M{x1},{y1} L{x2},{y2}" stroke="{LINK}" stroke-width="1.5"{dash} marker-end="url(#head)"/>')
+    p.append(f'<circle cx="{x1}" cy="{y1}" r="3" fill="{LINK}"/>')
     if text:
-        p.append(f'<text x="{tx}" y="{ty}" font-size="12.5" fill="{INK_2}" text-anchor="{anchor}">{text}</text>')
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        w = 7.2 * len(text) + 22
+        p.append(f'<rect x="{mx - w / 2:.1f}" y="{my - 13}" width="{w:.1f}" height="26" rx="13" fill="{BG}" stroke="{STROKE}"/>')
+        p.append(f'<text x="{mx:.1f}" y="{my + 4.5}" font-size="12.5" fill="{INK_2}" text-anchor="middle">{text}</text>')
 
 
-def stat(x, y, value, caption):
-    p.append(f'<text x="{x}" y="{y}" font-size="26" font-weight="500" fill="{INK}">{value}</text>')
-    p.append(f'<text x="{x}" y="{y + 22}" font-size="12.5" fill="{INK_3}">{caption}</text>')
+# column headers
+for x, t in zip(COLS, ("PUSH ENVIRONMENT", "MONGODB ATLAS", "PULL ENVIRONMENT")):
+    p.append(f'<text x="{x}" y="58" font-size="12" font-weight="600" letter-spacing="1.6" fill="{INK_3}">{t}</text>')
+p.append(f'<line x1="125" y1="70" x2="1375" y2="70" stroke="{STROKE}"/>')
 
+# row 1 - data path
+card(0, 0, "grid", "20 PROCESSES", "Producers", "push_script.py  ·  20-variable documents")
+card(1, 0, "mongodb", "REPLICA SET PRIMARY", "Atlas M0", "event_streaming.sensor_events")
+card(2, 0, "python", "SEPARATE PROCESS", "Pull consumer", "pull_script.py  ·  _id bookmark polling")
+# row 2 - oplog path
+card(0, 1, "replica", "2 NODES", "Secondaries", "apply oplog entries asynchronously")
+card(1, 1, "oplog", "LOCAL.OPLOG.RS", "Oplog", "one insert entry per acknowledged write")
+card(2, 1, "observer", "OBSERVER", "Monitor + replay", "atlas_monitor.py  ·  oplog_replay.py")
 
-# --- producers: 20 sessions as a pixel grid --------------------------------
-label(60, 70, "PUSH ENVIRONMENT")
-p.append(f'<rect x="60" y="92" width="300" height="236" rx="12" fill="{CARD}" stroke="{LINE}" stroke-width="1.2"/>')
-for i in range(20):
-    r, c = divmod(i, 5)
-    x, y = 86 + c * 52, 116 + r * 46
-    p.append(f'<rect x="{x}" y="{y}" width="40" height="34" rx="6" fill="{GREEN_SOFT}" stroke="{GREEN}" stroke-opacity="0.35"/>')
-    p.append(f'<text x="{x + 20}" y="{y + 22}" font-size="12.5" font-weight="500" fill="{INK}" text-anchor="middle">{i + 1:02d}</text>')
-p.append(f'<text x="86" y="316" font-size="13" fill="{INK_2}">20 × push_script.py · insert_one · w: majority</text>')
-stat(60, 392, "19,978", "acknowledged of 20,000")
-stat(230, 392, "107 ms", "insert p50")
-
-# --- atlas ---------------------------------------------------------------------------
-label(500, 70, "MONGODB ATLAS · M0 REPLICA SET")
-box(500, 92, 420, 92, "Primary", "event_streaming.sensor_events", accent=GREEN)
-box(500, 236, 420, 92, "local.oplog.rs", "one insert entry per write", accent=GREEN, fill=GREEN_SOFT)
-flow("M710,184 V230", GREEN)
-box(500, 380, 200, 80, "Secondary", "node 00")
-box(720, 380, 200, 80, "Secondary", "node 02")
-flow("M600,328 V374", FLOW, dashed=True)
-flow("M820,328 V374", FLOW, dashed=True)
-p.append(f'<text x="934" y="424" font-size="12.5" fill="{INK_2}">lag p95 1 s</text>')
-
-# --- consumers -------------------------------------------------------------------------
-label(1080, 70, "PULL ENVIRONMENT")
-box(1080, 92, 360, 92, "pull_script.py", "find(_id &gt; bookmark) every 1 s", accent=BLUE)
-stat(1080, 236, "79.8%", "of documents received")
-stat(1250, 236, "1.05 s", "push → pull p50")
-
-label(1080, 330, "OBSERVER")
-box(1080, 352, 360, 72, "atlas_monitor.py", "serverStatus · change stream")
-box(1080, 438, 360, 72, "oplog_replay.py", "100% of oplog entries", accent=GREEN)
-
-# --- main flows ------------------------------------------------------------------------
-flow("M360,138 H494", GREEN, "insert_one", 427, 128)
-flow("M920,138 H1074", BLUE, "poll", 997, 128)
-flow("M920,282 C1000,282 1000,474 1074,474", FLOW, "change stream", 968, 362, dashed=True, anchor="end")
-
-markers = "".join(
-    f'<marker id="m{c[1:]}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" '
-    f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{c}"/></marker>'
-    for c in (GREEN, BLUE, FLOW))
+g = 130  # horizontal gap between cards
+link(COLS[0] + CW, ROWS[0] + CH / 2, COLS[1] - 6, ROWS[0] + CH / 2, "insert_one")
+link(COLS[1] + CW, ROWS[0] + CH / 2, COLS[2] - 6, ROWS[0] + CH / 2, "find  ·  1 s")
+link(COLS[1] + CW / 2, ROWS[0] + CH, COLS[1] + CW / 2, ROWS[1] - 6, "")
+link(COLS[1], ROWS[1] + CH / 2, COLS[0] + CW + 6, ROWS[1] + CH / 2, "replicate", dashed=True)
+link(COLS[1] + CW, ROWS[1] + CH / 2, COLS[2] - 6, ROWS[1] + CH / 2, "change stream", dashed=True)
 
 svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="oplog-stream architecture">
   <title>oplog-stream architecture</title>
-  <desc>20 producer sessions insert into the Atlas primary; each write becomes one oplog entry replicated to two secondaries; a separate pull consumer polls by _id; an observer samples metrics and replays the oplog.</desc>
+  <desc>Twenty producers insert into the Atlas primary; a separate consumer polls it. Each write becomes one oplog entry, which secondaries replicate and an observer reads through a change stream.</desc>
   {style_block()}
-  <defs>{markers}</defs>
+  <defs>
+    <filter id="lift" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#14201B" flood-opacity="0.07"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="{LINK}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
   <rect width="{W}" height="{H}" fill="{BG}"/>
   {''.join(p)}
 </svg>
 """
-(ROOT / "assets" / "architecture-flow.svg").write_text(svg, encoding="utf-8")
-print("[OK] assets/architecture-flow.svg")
+(ROOT / "assets" / "architecture-pipeline.svg").write_text(svg, encoding="utf-8")
+print("[OK] assets/architecture-pipeline.svg")
