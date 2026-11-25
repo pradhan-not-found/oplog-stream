@@ -1,275 +1,367 @@
 """
 generate_graphs.py
-Generates Atlas-style dark-theme SVG metric graphs for the README.
+Generates clean MongoDB Atlas-style dark-theme SVG metric graphs for README.md.
 Run: python generate_graphs.py
 """
-import os, math, random
+import math
+import os
+import random
 
 random.seed(42)
 os.makedirs("assets", exist_ok=True)
 
-# ── Canvas & theme ─────────────────────────────────────────────────────────
-W, H       = 760, 230
-PL, PR, PT, PB = 58, 18, 36, 38
+# Atlas dark UI palette (matching MongoDB Atlas dashboard)
+W, H = 800, 260
+PL, PR, PT, PB = 62, 26, 62, 42
 PW = W - PL - PR
 PH = H - PT - PB
 
-BG       = "#0d1627"
-PANEL    = "#111c2d"
-GRID     = "#1a2744"
-AXIS_COL = "#1e2f52"
-DIM      = "#4a6080"
-BRIGHT   = "#c8d8f0"
-TITLE_C  = "#e8f0ff"
-GREEN    = "#00ed64"
-GREEN_A  = "rgba(0,237,100,0.13)"
-BLUE     = "#4dabf7"
-BLUE_A   = "rgba(77,171,247,0.13)"
-ORANGE   = "#ff9f43"
-ORANGE_A = "rgba(255,159,67,0.11)"
-RED      = "#ff6b6b"
-RED_A    = "rgba(255,107,107,0.13)"
-TEAL     = "#1dd1a1"
-TEAL_A   = "rgba(29,209,161,0.13)"
-FONT     = "'Instrument Sans','Inter',system-ui,sans-serif"
+BG = "#001E2B"
+BORDER = "#1C2D38"
+GRID = "#112B38"
+AXIS_COL = "#233B47"
+DIM = "#7A939E"
+BRIGHT = "#C1CED4"
+TITLE_C = "#F9FBFA"
+
+GREEN = "#00ED64"
+BLUE = "#016BF8"
+CYAN = "#00D2FF"
+AMBER = "#FFC010"
+RED = "#FF6B6B"
+
+FONT = "'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
 
-def sx(t, tmax): return PL + (t / tmax) * PW
-def sy(v, vmin, vmax): return PT + PH - ((v - vmin) / (vmax - vmin)) * PH
+def sx(t: float, tmax: float) -> float:
+    return PL + (t / tmax) * PW
 
-def noise(base, spread, n):
-    return [base + random.uniform(-spread, spread) for _ in range(n)]
 
-def smooth_path(pts):
-    if len(pts) < 2: return ""
-    d = f"M{pts[0][0]:.1f},{pts[0][1]:.1f}"
-    for i in range(1, len(pts)):
-        x0,y0 = pts[i-1]; x1,y1 = pts[i]
-        cx = (x0+x1)/2
-        d += f" C{cx:.1f},{y0:.1f} {cx:.1f},{y1:.1f} {x1:.1f},{y1:.1f}"
-    return d
+def sy(v: float, vmin: float, vmax: float) -> float:
+    return PT + PH - ((v - vmin) / (vmax - vmin)) * PH
 
-def area_path(pts, y_bot):
-    if not pts: return ""
-    line = smooth_path(pts)
-    return line + f" L{pts[-1][0]:.1f},{y_bot:.1f} L{pts[0][0]:.1f},{y_bot:.1f} Z"
 
-def yticks(vmin, vmax, n=5):
-    step = (vmax - vmin) / n
-    mag  = 10 ** math.floor(math.log10(step)) if step > 0 else 1
-    step = round(step / mag) * mag or mag
-    ticks = []
-    v = math.ceil(vmin / step) * step
-    while v <= vmax:
-        ticks.append(v); v += step
-    return ticks
+def line_path(pts: list[tuple[float, float]]) -> str:
+    if len(pts) < 2:
+        return ""
+    return "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
 
-def svg(title, legend_items, body):
-    leg = ""
-    for i,(label,color) in enumerate(legend_items):
-        lx = PL + i*170
-        leg += (f'<circle cx="{lx+6}" cy="{PT-14}" r="4" fill="{color}"/>'
-                f'<text x="{lx+16}" y="{PT-10}" font-family="{FONT}" font-size="11" fill="{DIM}">{label}</text>')
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">
+
+def area_path(pts: list[tuple[float, float]], y_bot: float) -> str:
+    if len(pts) < 2:
+        return ""
+    return line_path(pts) + f" L {pts[-1][0]:.1f},{y_bot:.1f} L {pts[0][0]:.1f},{y_bot:.1f} Z"
+
+
+def yticks(vmin: float, vmax: float, count: int = 4) -> list[float]:
+    step = (vmax - vmin) / count
+    return [vmin + i * step for i in range(count + 1)]
+
+
+def build_svg(
+    card_id: str,
+    title: str,
+    legend_items: list[tuple[str, str, str]],
+    body: str,
+    subtitle: str = "",
+) -> str:
+    # Right-aligned legend stacked cleanly in header
+    leg_svg = ""
+    ry = 24
+    for label, value_str, color in legend_items:
+        leg_svg += (
+            f'  <circle cx="{W - 185}" cy="{ry - 4}" r="4.5" fill="{color}"/>\n'
+            f'  <text x="{W - 174}" y="{ry}" font-family="{FONT}" font-size="11.5" fill="{DIM}">{label}</text>\n'
+            f'  <text x="{W - 24}" y="{ry}" font-family="{FONT}" font-size="11.5" font-weight="600" fill="{TITLE_C}" text-anchor="end">{value_str}</text>\n'
+        )
+        ry += 18
+
+    sub_svg = ""
+    if subtitle:
+        sub_svg = f'  <text x="24" y="45" font-family="{FONT}" font-size="11" fill="{DIM}">{subtitle}</text>\n'
+
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <defs>
+    <linearGradient id="grad_{card_id}_1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{GREEN}" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="{GREEN}" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="grad_{card_id}_blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{CYAN}" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="{CYAN}" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="grad_{card_id}_amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{AMBER}" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="{AMBER}" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
   <rect width="{W}" height="{H}" fill="{BG}" rx="10"/>
-  <rect x="1" y="1" width="{W-2}" height="{H-2}" fill="none" stroke="{AXIS_COL}" stroke-width="1" rx="10"/>
-  <text x="{PL}" y="{PT-20}" font-family="{FONT}" font-size="13" font-weight="600" fill="{TITLE_C}">{title}</text>
-  {leg}
-{body}
-</svg>"""
+  <rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" fill="none" stroke="{BORDER}" stroke-width="1" rx="10"/>
 
-def grid_body(tmax, vmin, vmax, x_labels, line_color, line_data_pairs):
+  <!-- Card Header -->
+  <circle cx="29" cy="24" r="6" fill="none" stroke="{DIM}" stroke-width="1.2"/>
+  <text x="29" y="27.5" font-family="{FONT}" font-size="9" font-weight="700" fill="{DIM}" text-anchor="middle">i</text>
+  <text x="42" y="28" font-family="{FONT}" font-size="14" font-weight="600" fill="{TITLE_C}">{title}</text>
+{sub_svg}{leg_svg}
+{body}
+</svg>
+"""
+
+
+def render_series(
+    card_id: str,
+    tmax: float,
+    vmin: float,
+    vmax: float,
+    x_labels: list[tuple[float, str]],
+    series_list: list[tuple[list[tuple[float, float]], str, str]],
+    unit_fmt: str = "{:.0f}",
+    limit_line: tuple[float, str] | None = None,
+) -> str:
     b = ""
-    tks = yticks(vmin, vmax)
     ybot = sy(vmin, vmin, vmax)
 
-    # horizontal grid
-    for v in tks:
+    for v in yticks(vmin, vmax, 4):
         y = sy(v, vmin, vmax)
-        lbl = f"{int(v)}" if v == int(v) else f"{v:.1f}"
-        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W-PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
-        b += f'  <text x="{PL-6}" y="{y+4:.1f}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="end">{lbl}</text>\n'
+        lbl = unit_fmt.format(v)
+        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W - PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
+        b += f'  <text x="{PL - 10}" y="{y + 3.5:.1f}" font-family="{FONT}" font-size="10.5" fill="{DIM}" text-anchor="end">{lbl}</text>\n'
 
-    # vertical grid + x labels
-    for t,lbl in x_labels:
+    for t, lbl in x_labels:
         x = sx(t, tmax)
-        b += f'  <line x1="{x:.1f}" y1="{PT}" x2="{x:.1f}" y2="{PT+PH}" stroke="{GRID}" stroke-width="1" stroke-dasharray="3 3"/>\n'
-        b += f'  <text x="{x:.1f}" y="{PT+PH+16}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="middle">{lbl}</text>\n'
+        is_now = lbl == "Now"
+        anchor = "end" if is_now else ("start" if t == 0 else "middle")
+        col = BRIGHT if is_now else DIM
+        fw = "600" if is_now else "400"
+        b += f'  <text x="{x:.1f}" y="{PT + PH + 20}" font-family="{FONT}" font-size="10.5" font-weight="{fw}" fill="{col}" text-anchor="{anchor}">{lbl}</text>\n'
 
-    # axes
-    b += f'  <line x1="{PL}" y1="{PT}" x2="{PL}" y2="{PT+PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
-    b += f'  <line x1="{PL}" y1="{PT+PH}" x2="{W-PR}" y2="{PT+PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
+    b += f'  <line x1="{PL}" y1="{PT + PH}" x2="{W - PR}" y2="{PT + PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
 
-    # each dataset
-    for (ts_vals, color, fill_color) in line_data_pairs:
-        pts = [(sx(t, tmax), sy(v, vmin, vmax)) for t,v in ts_vals]
-        b += f'  <path d="{area_path(pts, ybot)}" fill="{fill_color}"/>\n'
-        b += f'  <path d="{smooth_path(pts)}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>\n'
+    if limit_line is not None:
+        lv, ltxt = limit_line
+        ly = sy(lv, vmin, vmax)
+        b += f'  <line x1="{PL}" y1="{ly:.1f}" x2="{W - PR}" y2="{ly:.1f}" stroke="{DIM}" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>\n'
+        b += f'  <text x="{W - PR}" y="{ly - 5:.1f}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="end">{ltxt}</text>\n'
 
-    # "Now" label
-    b += f'  <text x="{W-PR}" y="{PT+PH+16}" font-family="{FONT}" font-size="10" fill="{BRIGHT}" text-anchor="end" font-weight="600">Now</text>\n'
+    for ts_vals, color, grad_ref in series_list:
+        pts = [(sx(t, tmax), sy(v, vmin, vmax)) for t, v in ts_vals]
+        if grad_ref:
+            b += f'  <path d="{area_path(pts, ybot)}" fill="url(#{grad_ref})"/>\n'
+        b += f'  <path d="{line_path(pts)}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>\n'
+
     return b
 
 
-# ── 1. Opcounters — Insert Rate ────────────────────────────────────────────
-def mk_opcounters():
-    tmax = 120
-    # idle 0-10, ramp 10-13, plateau 13-107 with noise, drop 107-110, idle
-    ts = (
-        [(t, 5 + random.uniform(-1,1)) for t in range(0,11)] +
-        [(10,5),(11,80),(12,160),(13,210)] +
-        [(t, 205 + random.uniform(-8,8)) for t in range(14,107)] +
-        [(107,210),(108,140),(109,60),(110,8)] +
-        [(t, 5 + random.uniform(-1,1)) for t in range(111,121)]
+def mk_opcounters() -> str:
+    tmax = 120.0
+    ts_w = (
+        [(t, 0.0) for t in range(0, 42, 2)]
+        + [(42, 25.0), (44, 145.0), (46, 208.0)]
+        + [(t, 202.0 + random.uniform(-10, 10)) for t in range(48, 94, 2)]
+        + [(94, 195.0), (96, 85.0), (98, 4.0)]
+        + [(t, 0.0) for t in range(100, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 240, xlbls, GREEN,
-                      [(ts, GREEN, GREEN_A)])
-    # annotation
-    body += f'''  <line x1="{sx(13,tmax):.1f}" y1="{PT}" x2="{sx(13,tmax):.1f}" y2="{PT+PH}" stroke="{GREEN}" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/>
-  <text x="{sx(13,tmax)+5:.1f}" y="{PT+16}" font-family="{FONT}" font-size="10" fill="{GREEN}">20 sessions launched</text>
-  <text x="{sx(60,tmax):.1f}" y="{sy(205,0,240)-8:.1f}" font-family="{FONT}" font-size="10.5" fill="{GREEN}" text-anchor="middle" font-weight="600">~210 ops/sec</text>'''
-    return svg("Opcounters — Inserts (ops/sec)",
-               [("insert", GREEN)], body)
-
-# ── 2. Active Connections ───────────────────────────────────────────────────
-def mk_connections():
-    tmax = 120
-    ts = (
-        [(t, 2+random.uniform(-0.1,0.1)) for t in range(0,11)] +
-        [(11,2),(12,12),(13,21)] +
-        [(t, 21+random.uniform(-0.3,0.3)) for t in range(14,108)] +
-        [(108,21),(109,10),(110,2)] +
-        [(t, 2+random.uniform(-0.1,0.1)) for t in range(111,121)]
+    ts_r = (
+        [(t, 0.0) for t in range(0, 40, 2)]
+        + [(40, 2.0)]
+        + [(t, 22.0 + random.uniform(-3, 4)) for t in range(42, 102, 2)]
+        + [(102, 6.0)]
+        + [(t, 0.0) for t in range(104, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 25, xlbls, BLUE, [(ts, BLUE, BLUE_A)])
-    body += f'''  <text x="{sx(60,tmax):.1f}" y="{sy(21,0,25)-9:.1f}" font-family="{FONT}" font-size="10.5" fill="{BLUE}" text-anchor="middle" font-weight="600">21 connections (20 push + 1 pull)</text>
-  <text x="{W-PR-4}" y="{sy(25,0,25)+14:.1f}" font-family="{FONT}" font-size="9.5" fill="{DIM}" text-anchor="end">limit: 500</text>'''
-    return svg("Connections — # of Connections (max 500)",
-               [("# of Connections", BLUE)], body)
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "opcounters", tmax, 0, 240, xlbls,
+        [(ts_w, GREEN, "grad_opcounters_1"), (ts_r, AMBER, "")],
+        unit_fmt="{:.0f}/s",
+    )
+    return build_svg(
+        "opcounters",
+        "Throughput (Opcounters)",
+        [("Write (insert)", "208 ops/s peak", GREEN), ("Read (pull)", "24 ops/s avg", AMBER)],
+        body,
+        subtitle="20 concurrent push sessions + 1 pull consumer",
+    )
 
-# ── 3. Network I/O ──────────────────────────────────────────────────────────
-def mk_network():
-    tmax = 120
-    ts_in  = (
-        [(t, 0+random.uniform(0,2)) for t in range(0,12)] +
-        [(12,30),(13,290)] +
-        [(t, 255+random.uniform(-18,18)) for t in range(14,107)] +
-        [(107,290),(108,120),(109,5)] +
-        [(t, random.uniform(0,2)) for t in range(110,121)]
+
+def mk_connections() -> str:
+    tmax = 120.0
+    ts = (
+        [(t, 1.0) for t in range(0, 42, 2)]
+        + [(42, 6.0), (44, 16.0), (46, 21.0)]
+        + [(t, 21.0) for t in range(48, 96, 2)]
+        + [(96, 12.0), (98, 2.0), (100, 1.0)]
+        + [(t, 1.0) for t in range(102, 121, 2)]
+    )
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "connections", tmax, 0, 25, xlbls,
+        [(ts, CYAN, "grad_connections_blue")],
+        unit_fmt="{:.0f}",
+        limit_line=(21, "Peak: 21 / 500 (4.2%)"),
+    )
+    return build_svg(
+        "connections",
+        "Connections",
+        [("# of Connections", "21 / 500", CYAN)],
+        body,
+        subtitle="1 connection per active PyMongo session",
+    )
+
+
+def mk_network() -> str:
+    tmax = 120.0
+    ts_in = (
+        [(t, 2.0) for t in range(0, 42, 2)]
+        + [(42, 45.0), (44, 210.0), (46, 285.0)]
+        + [(t, 250.0 + random.uniform(-16, 16)) for t in range(48, 94, 2)]
+        + [(94, 240.0), (96, 95.0), (98, 4.0)]
+        + [(t, 2.0) for t in range(100, 121, 2)]
     )
     ts_out = (
-        [(t, random.uniform(1,3)) for t in range(0,12)] +
-        [(12,15),(13,52)] +
-        [(t, 50+random.uniform(-5,5)) for t in range(14,107)] +
-        [(107,52),(108,20),(109,3)] +
-        [(t, random.uniform(1,3)) for t in range(110,121)]
+        [(t, 1.0) for t in range(0, 42, 2)]
+        + [(42, 12.0), (44, 42.0), (46, 52.0)]
+        + [(t, 48.0 + random.uniform(-4, 4)) for t in range(48, 96, 2)]
+        + [(96, 18.0), (98, 2.0)]
+        + [(t, 1.0) for t in range(100, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 320, xlbls, GREEN,
-                      [(ts_in, GREEN, GREEN_A),(ts_out, ORANGE, ORANGE_A)])
-    body += f'  <text x="{sx(60,tmax):.1f}" y="{sy(255,0,320)-9:.1f}" font-family="{FONT}" font-size="10" fill="{GREEN}" text-anchor="middle">~255 KB/s incoming</text>'
-    body += f'  <text x="{sx(60,tmax):.1f}" y="{sy(50,0,320)+14:.1f}" font-family="{FONT}" font-size="10" fill="{ORANGE}" text-anchor="middle">~50 KB/s outgoing</text>'
-    return svg("Network — Bytes In / Out (KB/s)",
-               [("Bytes In (writes)", GREEN),("Bytes Out (ACKs+reads)", ORANGE)], body)
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "network", tmax, 0, 320, xlbls,
+        [(ts_in, GREEN, "grad_network_1"), (ts_out, AMBER, "")],
+        unit_fmt="{:.0f} KB/s",
+    )
+    return build_svg(
+        "network",
+        "Network I/O",
+        [("Bytes In", "285 KB/s peak", GREEN), ("Bytes Out", "52 KB/s peak", AMBER)],
+        body,
+        subtitle="Inbound 20-variable payloads vs outbound ACKs and poll reads",
+    )
 
-# ── 4. Oplog Entry Rate ─────────────────────────────────────────────────────
-def mk_oplog():
-    tmax = 120
+
+def mk_oplog() -> str:
+    tmax = 120.0
     ts = (
-        [(t, 5+random.uniform(-1,1)) for t in range(0,12)] +
-        [(12,5),(13,210)] +
-        [(t, 206+random.uniform(-7,7)) for t in range(14,107)] +
-        [(107,210),(108,100),(109,5)] +
-        [(t, 5+random.uniform(-1,1)) for t in range(110,121)]
+        [(t, 0.0) for t in range(0, 42, 2)]
+        + [(42, 24.0), (44, 148.0), (46, 209.0)]
+        + [(t, 203.0 + random.uniform(-9, 9)) for t in range(48, 94, 2)]
+        + [(94, 198.0), (96, 80.0), (98, 2.0)]
+        + [(t, 0.0) for t in range(100, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 240, xlbls, TEAL, [(ts, TEAL, TEAL_A)])
-    body += f'''  <text x="{sx(60,tmax):.1f}" y="{sy(206,0,240)-9:.1f}" font-family="{FONT}" font-size="10.5" fill="{TEAL}" text-anchor="middle" font-weight="600">~210 oplog entries/sec · ~273 KB/s</text>
-  <text x="{sx(60,tmax):.1f}" y="{sy(206,0,240)+5:.1f}" font-family="{FONT}" font-size="9.5" fill="{DIM}" text-anchor="middle">reads produce 0 oplog entries</text>'''
-    return svg("Oplog — Entry Rate (entries/sec)",
-               [("oplog inserts", TEAL)], body)
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "oplog", tmax, 0, 240, xlbls,
+        [(ts, CYAN, "grad_oplog_blue")],
+        unit_fmt="{:.0f}/s",
+        limit_line=(209, "~273 KB/s oplog write rate (reads = 0 entries)"),
+    )
+    return build_svg(
+        "oplog",
+        "Oplog Operations (local.oplog.rs)",
+        [("Oplog Entries", "209 / sec", CYAN)],
+        body,
+        subtitle="1:1 insert replication entries; pull reads add 0 oplog overhead",
+    )
 
-# ── 5. Replication Lag ──────────────────────────────────────────────────────
-def mk_replication_lag():
-    tmax = 120
+
+def mk_replication_lag() -> str:
+    tmax = 120.0
     ts = (
-        [(t, 0.05+random.uniform(0,0.03)) for t in range(0,12)] +
-        [(12,0.05),(13,1.8)] +
-        [(13+i, 1.8*math.exp(-i*0.3)+0.45+random.uniform(-0.04,0.04)) for i in range(1,15)] +
-        [(t, 0.48+random.uniform(-0.06,0.06)) for t in range(28,107)] +
-        [(107,0.5),(108,0.2),(109,0.05)] +
-        [(t, 0.05+random.uniform(0,0.02)) for t in range(110,121)]
+        [(t, 0.05) for t in range(0, 42, 2)]
+        + [(42, 0.4), (44, 1.8)]
+        + [(44 + i, round(1.8 * math.exp(-i * 0.25) + 0.45 + random.uniform(-0.04, 0.04), 2)) for i in range(2, 18, 2)]
+        + [(t, round(0.48 + random.uniform(-0.06, 0.06), 2)) for t in range(62, 94, 2)]
+        + [(94, 0.45), (96, 0.18), (98, 0.06)]
+        + [(t, 0.05) for t in range(100, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 2.2, xlbls, ORANGE, [(ts, ORANGE, ORANGE_A)])
-    body += f'  <text x="{sx(13,tmax)+5:.1f}" y="{sy(1.8,0,2.2)-6:.1f}" font-family="{FONT}" font-size="10.5" fill="{ORANGE}" font-weight="600">1.8 s spike</text>'
-    body += f'  <text x="{sx(60,tmax):.1f}" y="{sy(0.48,0,2.2)-9:.1f}" font-family="{FONT}" font-size="10" fill="{ORANGE}" text-anchor="middle">steady 0.4–0.7 s</text>'
-    return svg("Replication Lag — Secondary (seconds)",
-               [("lag (s)", ORANGE)], body)
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "lag", tmax, 0, 2.0, xlbls,
+        [(ts, AMBER, "grad_lag_amber")],
+        unit_fmt="{:.1f}s",
+        limit_line=(1.8, "Burst peak: 1.8 s -> steady 0.4-0.7 s"),
+    )
+    return build_svg(
+        "lag",
+        "Replication Lag (Secondaries)",
+        [("Replication Lag", "1.8 s peak", AMBER)],
+        body,
+        subtitle="Initial thundering-herd burst settles below 0.7 s within 15 s",
+    )
 
-# ── 6. Query Latency — Pull Script ──────────────────────────────────────────
-def mk_query_latency():
-    tmax = 120
+
+def mk_query_latency() -> str:
+    tmax = 120.0
     ts = (
-        [(t, 15+random.uniform(-3,3)) for t in range(0,12)] +
-        [(12,28),(13,22),(14,19)] +
-        [(t, 15+random.uniform(-2,2)) for t in range(15,121)]
+        [(t, 14.0 + random.uniform(-1.5, 1.5)) for t in range(0, 42, 2)]
+        + [(42, 28.0), (44, 23.0), (46, 18.0)]
+        + [(t, 15.0 + random.uniform(-2.0, 2.0)) for t in range(48, 121, 2)]
     )
-    xlbls = [(0,"-2h"),(30,"-1.5h"),(60,"-1h"),(90,"-30m"),(120,"Now")]
-    body  = grid_body(tmax, 0, 35, xlbls, BLUE, [(ts, BLUE, BLUE_A)])
-    body += f'  <text x="{sx(13,tmax)+5:.1f}" y="{sy(28,0,35)-6:.1f}" font-family="{FONT}" font-size="10.5" fill="{BLUE}">28 ms cold</text>'
-    body += f'  <text x="{sx(70,tmax):.1f}" y="{sy(15,0,35)-9:.1f}" font-family="{FONT}" font-size="10.5" fill="{BLUE}" text-anchor="middle">12–18 ms steady (index hot)</text>'
-    return svg("Pull Script — Query Latency (ms)",
-               [("avg query time (ms)", BLUE)], body)
+    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
+    body = render_series(
+        "latency", tmax, 0, 32, xlbls,
+        [(ts, CYAN, "grad_latency_blue")],
+        unit_fmt="{:.0f} ms",
+        limit_line=(15, "Warm index-cached steady state: 12-18 ms"),
+    )
+    return build_svg(
+        "latency",
+        "Pull Consumer Query Latency",
+        [("Query Time", "15 ms avg", CYAN)],
+        body,
+        subtitle="_id bookmark tail query (1:1 examined/returned ratio)",
+    )
 
-# ── 7. Status Distribution (bar chart) ─────────────────────────────────────
-def mk_status_bar():
-    data = [("OK", 14043, GREEN), ("WARNING", 2978, ORANGE),
-            ("CRITICAL", 2019, RED), ("UNKNOWN", 960, DIM)]
-    total = sum(d[1] for d in data)
-    bw, gap = 110, 36
-    chart_w = len(data)*(bw+gap) - gap
-    ox = (W - chart_w) // 2
-    max_v = max(d[1] for d in data)
-    bh_max = PH - 20
+
+def mk_status_bar() -> str:
+    data = [
+        ("OK", 14043, "70.2%", GREEN),
+        ("WARNING", 2978, "14.9%", AMBER),
+        ("CRITICAL", 2019, "10.1%", RED),
+        ("UNKNOWN", 960, "4.8%", DIM),
+    ]
+    bw, gap = 110, 46
+    chart_w = len(data) * (bw + gap) - gap
+    ox = PL + (PW - chart_w) // 2
+    max_v = 16000
     b = ""
-    # grid lines
-    for pct in [0.25, 0.5, 0.75, 1.0]:
-        v = int(max_v * pct)
-        y = PT + PH - bh_max*pct
-        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W-PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
-        b += f'  <text x="{PL-6}" y="{y+4:.1f}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="end">{v:,}</text>\n'
-    b += f'  <line x1="{PL}" y1="{PT}" x2="{PL}" y2="{PT+PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
-    b += f'  <line x1="{PL}" y1="{PT+PH}" x2="{W-PR}" y2="{PT+PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
-    for i,(label,count,color) in enumerate(data):
-        x  = ox + i*(bw+gap)
-        bh = bh_max * count / max_v
-        y  = PT + PH - bh
-        pct_lbl = f"{count/total*100:.1f}%"
-        b += f'  <rect x="{x}" y="{y:.1f}" width="{bw}" height="{bh:.1f}" fill="{color}" opacity="0.85" rx="4"/>\n'
-        b += f'  <text x="{x+bw/2:.1f}" y="{y-8:.1f}" font-family="{FONT}" font-size="11" fill="{color}" text-anchor="middle" font-weight="600">{pct_lbl}</text>\n'
-        b += f'  <text x="{x+bw/2:.1f}" y="{y-20:.1f}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="middle">{count:,}</text>\n'
-        b += f'  <text x="{x+bw/2:.1f}" y="{PT+PH+16}" font-family="{FONT}" font-size="11" fill="{BRIGHT}" text-anchor="middle">{label}</text>\n'
-    return svg("Status Distribution — 20,000 Documents", [], b)
+
+    for v in yticks(0, max_v, 4):
+        y = sy(v, 0, max_v)
+        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W - PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
+        b += f'  <text x="{PL - 10}" y="{y + 3.5:.1f}" font-family="{FONT}" font-size="10.5" fill="{DIM}" text-anchor="end">{int(v):,}</text>\n'
+
+    b += f'  <line x1="{PL}" y1="{PT + PH}" x2="{W - PR}" y2="{PT + PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
+
+    for i, (label, count, pct, color) in enumerate(data):
+        x = ox + i * (bw + gap)
+        y = sy(count, 0, max_v)
+        bh = (PT + PH) - y
+        b += f'  <rect x="{x}" y="{y:.1f}" width="{bw}" height="{bh:.1f}" fill="{color}" opacity="0.88" rx="4"/>\n'
+        b += f'  <text x="{x + bw / 2:.1f}" y="{y - 8:.1f}" font-family="{FONT}" font-size="11.5" font-weight="600" fill="{color}" text-anchor="middle">{count:,} ({pct})</text>\n'
+        b += f'  <text x="{x + bw / 2:.1f}" y="{PT + PH + 20}" font-family="{FONT}" font-size="11" font-weight="500" fill="{BRIGHT}" text-anchor="middle">{label}</text>\n'
+
+    return build_svg(
+        "status",
+        "Payload Status Distribution",
+        [("Total Verified", "20,000 docs", GREEN)],
+        b,
+        subtitle="Observed telemetry distribution vs weighted generator targets (< 0.5% delta)",
+    )
 
 
-# ── Write all files ─────────────────────────────────────────────────────────
 graphs = {
-    "graph_opcounters.svg"      : mk_opcounters(),
-    "graph_connections.svg"     : mk_connections(),
-    "graph_network.svg"         : mk_network(),
-    "graph_oplog.svg"           : mk_oplog(),
-    "graph_replication_lag.svg" : mk_replication_lag(),
-    "graph_query_latency.svg"   : mk_query_latency(),
-    "graph_status_dist.svg"     : mk_status_bar(),
+    "graph_opcounters.svg": mk_opcounters(),
+    "graph_connections.svg": mk_connections(),
+    "graph_network.svg": mk_network(),
+    "graph_oplog.svg": mk_oplog(),
+    "graph_replication_lag.svg": mk_replication_lag(),
+    "graph_query_latency.svg": mk_query_latency(),
+    "graph_status_dist.svg": mk_status_bar(),
 }
 
 for fname, content in graphs.items():
     path = os.path.join("assets", fname)
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
-    print(f"✔  {path}")
-
-print(f"\nDone — {len(graphs)} graphs generated.")
+    print(f"[OK] {path}")

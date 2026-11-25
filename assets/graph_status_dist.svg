@@ -1,33 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 230">
-  <rect width="760" height="230" fill="#0d1627" rx="10"/>
-  <rect x="1" y="1" width="758" height="228" fill="none" stroke="#1e2f52" stroke-width="1" rx="10"/>
-  <text x="58" y="16" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="13" font-weight="600" fill="#e8f0ff">Status Distribution — 20,000 Documents</text>
-  
-  <line x1="58" y1="158.0" x2="742" y2="158.0" stroke="#1a2744" stroke-width="1"/>
-  <text x="52" y="162.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">3,510</text>
-  <line x1="58" y1="124.0" x2="742" y2="124.0" stroke="#1a2744" stroke-width="1"/>
-  <text x="52" y="128.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">7,021</text>
-  <line x1="58" y1="90.0" x2="742" y2="90.0" stroke="#1a2744" stroke-width="1"/>
-  <text x="52" y="94.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">10,532</text>
-  <line x1="58" y1="56.0" x2="742" y2="56.0" stroke="#1a2744" stroke-width="1"/>
-  <text x="52" y="60.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="end">14,043</text>
-  <line x1="58" y1="36" x2="58" y2="192" stroke="#1e2f52" stroke-width="1"/>
-  <line x1="58" y1="192" x2="742" y2="192" stroke="#1e2f52" stroke-width="1"/>
-  <rect x="106" y="56.0" width="110" height="136.0" fill="#00ed64" opacity="0.85" rx="4"/>
-  <text x="161.0" y="48.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#00ed64" text-anchor="middle" font-weight="600">70.2%</text>
-  <text x="161.0" y="36.0" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">14,043</text>
-  <text x="161.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">OK</text>
-  <rect x="252" y="163.2" width="110" height="28.8" fill="#ff9f43" opacity="0.85" rx="4"/>
-  <text x="307.0" y="155.2" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#ff9f43" text-anchor="middle" font-weight="600">14.9%</text>
-  <text x="307.0" y="143.2" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">2,978</text>
-  <text x="307.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">WARNING</text>
-  <rect x="398" y="172.4" width="110" height="19.6" fill="#ff6b6b" opacity="0.85" rx="4"/>
-  <text x="453.0" y="164.4" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#ff6b6b" text-anchor="middle" font-weight="600">10.1%</text>
-  <text x="453.0" y="152.4" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">2,019</text>
-  <text x="453.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">CRITICAL</text>
-  <rect x="544" y="182.7" width="110" height="9.3" fill="#4a6080" opacity="0.85" rx="4"/>
-  <text x="599.0" y="174.7" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#4a6080" text-anchor="middle" font-weight="600">4.8%</text>
-  <text x="599.0" y="162.7" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="10" fill="#4a6080" text-anchor="middle">960</text>
-  <text x="599.0" y="208" font-family="'Instrument Sans','Inter',system-ui,sans-serif" font-size="11" fill="#c8d8f0" text-anchor="middle">UNKNOWN</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" width="800" height="260">
+  <defs>
+    <linearGradient id="grad_status_1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00ED64" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00ED64" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="grad_status_blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00D2FF" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="grad_status_amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFC010" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#FFC010" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="260" fill="#001E2B" rx="10"/>
+  <rect x="0.5" y="0.5" width="799" height="259" fill="none" stroke="#1C2D38" stroke-width="1" rx="10"/>
+
+  <!-- Card Header -->
+  <circle cx="29" cy="24" r="6" fill="none" stroke="#7A939E" stroke-width="1.2"/>
+  <text x="29" y="27.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="9" font-weight="700" fill="#7A939E" text-anchor="middle">i</text>
+  <text x="42" y="28" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#F9FBFA">Payload Status Distribution</text>
+  <text x="24" y="45" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" fill="#7A939E">Observed telemetry distribution vs weighted generator targets (< 0.5% delta)</text>
+  <circle cx="615" cy="20" r="4.5" fill="#00ED64"/>
+  <text x="626" y="24" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" fill="#7A939E">Total Verified</text>
+  <text x="776" y="24" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#F9FBFA" text-anchor="end">20,000 docs</text>
+
+  <line x1="62" y1="218.0" x2="774" y2="218.0" stroke="#112B38" stroke-width="1"/>
+  <text x="52" y="221.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10.5" fill="#7A939E" text-anchor="end">0</text>
+  <line x1="62" y1="179.0" x2="774" y2="179.0" stroke="#112B38" stroke-width="1"/>
+  <text x="52" y="182.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10.5" fill="#7A939E" text-anchor="end">4,000</text>
+  <line x1="62" y1="140.0" x2="774" y2="140.0" stroke="#112B38" stroke-width="1"/>
+  <text x="52" y="143.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10.5" fill="#7A939E" text-anchor="end">8,000</text>
+  <line x1="62" y1="101.0" x2="774" y2="101.0" stroke="#112B38" stroke-width="1"/>
+  <text x="52" y="104.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10.5" fill="#7A939E" text-anchor="end">12,000</text>
+  <line x1="62" y1="62.0" x2="774" y2="62.0" stroke="#112B38" stroke-width="1"/>
+  <text x="52" y="65.5" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10.5" fill="#7A939E" text-anchor="end">16,000</text>
+  <line x1="62" y1="218" x2="774" y2="218" stroke="#233B47" stroke-width="1"/>
+  <rect x="129" y="81.1" width="110" height="136.9" fill="#00ED64" opacity="0.88" rx="4"/>
+  <text x="184.0" y="73.1" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#00ED64" text-anchor="middle">14,043 (70.2%)</text>
+  <text x="184.0" y="238" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="500" fill="#C1CED4" text-anchor="middle">OK</text>
+  <rect x="285" y="189.0" width="110" height="29.0" fill="#FFC010" opacity="0.88" rx="4"/>
+  <text x="340.0" y="181.0" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#FFC010" text-anchor="middle">2,978 (14.9%)</text>
+  <text x="340.0" y="238" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="500" fill="#C1CED4" text-anchor="middle">WARNING</text>
+  <rect x="441" y="198.3" width="110" height="19.7" fill="#FF6B6B" opacity="0.88" rx="4"/>
+  <text x="496.0" y="190.3" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#FF6B6B" text-anchor="middle">2,019 (10.1%)</text>
+  <text x="496.0" y="238" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="500" fill="#C1CED4" text-anchor="middle">CRITICAL</text>
+  <rect x="597" y="208.6" width="110" height="9.4" fill="#7A939E" opacity="0.88" rx="4"/>
+  <text x="652.0" y="200.6" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#7A939E" text-anchor="middle">960 (4.8%)</text>
+  <text x="652.0" y="238" font-family="'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="500" fill="#C1CED4" text-anchor="middle">UNKNOWN</text>
 
 </svg>

@@ -23,7 +23,12 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-console = Console()
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+console = Console(legacy_windows=False)
 LOG_DIR = Path(__file__).parent / "logs"
 
 
@@ -56,24 +61,24 @@ def launch_sessions(
                 ["cmd", "/c", "start", f"Session-{sid:02d}",
                  "cmd", "/k", " ".join(cmd)],
                 cwd=str(Path(__file__).parent),
-                env={**os.environ, "SESSION_ID": str(sid)},
+                env={**os.environ, "SESSION_ID": str(sid), "PYTHONIOENCODING": "utf-8"},
             )
         else:
-            # Headless: stdout + stderr → individual log files
+            # Headless: stdout + stderr -> individual log files
             log_fh = open(log_file, "w", encoding="utf-8")
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(Path(__file__).parent),
                 stdout=log_fh,
                 stderr=log_fh,
-                env={**os.environ, "SESSION_ID": str(sid)},
+                env={**os.environ, "SESSION_ID": str(sid), "PYTHONIOENCODING": "utf-8"},
             )
-            console.print(f"  [green]Session {sid:02d}[/] PID={proc.pid}  → {log_file}")
+            console.print(f"  [green]Session {sid:02d}[/] PID={proc.pid}  -> {log_file}")
 
         processes.append(proc)
         time.sleep(0.05)   # slight stagger to avoid thundering-herd on Atlas
 
-    console.print(f"\n[bold]✔ {len(processes)} sessions launched.[/]\n")
+    console.print(f"\n[bold][OK] {len(processes)} sessions launched.[/]\n")
     return processes
 
 

@@ -22,9 +22,14 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 load_dotenv()
 
-console = Console()
+console = Console(legacy_windows=False)
 
 
 # ---------------------------------------------------------------------------
@@ -157,9 +162,9 @@ def main() -> None:
     client = MongoClient(args.uri, serverSelectionTimeoutMS=10_000)
     try:
         client.admin.command("ping")
-        console.print("[bold green]✔ Connected to MongoDB Atlas[/]")
+        console.print("[bold green][OK] Connected to MongoDB Atlas[/]")
     except errors.ServerSelectionTimeoutError as exc:
-        console.print(f"[bold red]✘ Connection failed:[/] {exc}")
+        console.print(f"[bold red][FAIL] Connection failed:[/] {exc}")
         sys.exit(1)
 
     db         = client[os.getenv("DB_NAME", "event_streaming")]

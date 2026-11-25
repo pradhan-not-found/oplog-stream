@@ -23,9 +23,14 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 load_dotenv()
 
-console = Console()
+console = Console(legacy_windows=False)
 
 # ---------------------------------------------------------------------------
 # 20-variable document generator
@@ -116,7 +121,7 @@ def run_push(collection: Collection, session_id: int,
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TextColumn("✔ {task.fields[ok]}  ✘ {task.fields[fail]}"),
+        TextColumn("OK {task.fields[ok]}  FAIL {task.fields[fail]}"),
         TimeElapsedColumn(),
         console=console,
         transient=False,
@@ -183,22 +188,26 @@ def main() -> None:
                       "Copy .env.example to .env and fill in your Atlas credentials.")
         sys.exit(1)
 
-    console.print(f"[bold]Connecting to Atlas …[/]  session_id={args.session_id}")
+    console.print(f"[bold]Connecting to Atlas...[/]  session_id={args.session_id}")
     client = MongoClient(args.uri, serverSelectionTimeoutMS=10_000)
     try:
         client.admin.command("ping")
-        console.print("[bold green]✔ Connected to MongoDB Atlas[/]")
+        console.print("[bold green][OK] Connected to MongoDB Atlas[/]")
     except errors.ServerSelectionTimeoutError as exc:
-        console.print(f"[bold red]✘ Connection failed:[/] {exc}")
+        console.print(f"[bold red][FAIL] Connection failed:[/] {exc}")
         sys.exit(1)
 
     db         = client[os.getenv("DB_NAME", "event_streaming")]
     collection = db[os.getenv("COLLECTION_NAME", "sensor_events")]
 
-    # Create indexes once (safe to call multiple times; idempotent)
-    collection.create_index([("session_id", 1), ("sequence", 1)])
-    collection.create_index([("timestamp", -1)])
-    collection.create_index([("status", 1)])
+    # Create indexes once (safe if multiple sessions race on initial startup)
+    if args.session_id == 1:
+        try:
+            collection.create_index([("session_id", 1), ("sequence", 1)])
+            collection.create_index([("timestamp", -1)])
+            collection.create_index([("status", 1)])
+        except errors.PyMongoError as exc:
+            console.log(f"[yellow]Index setup note: {exc}[/]")
 
     run_push(collection, args.session_id, args.total, args.interval)
     client.close()
