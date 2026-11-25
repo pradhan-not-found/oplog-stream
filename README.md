@@ -20,7 +20,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 <img src="assets/architecture-overview.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
 
 <table width="100%">
-  <tr><th align="left">Component</th><th align="left">Role</th></tr>
+  <tr><th width="240" align="left">Component</th><th width="600" align="left">Role</th></tr>
   <tr><td align="left"><code>push_script.py</code></td><td align="left">Generates one 20-variable document per loop iteration and inserts it with <code>insert_one</code>. Records the latency of every acknowledged insert.</td></tr>
   <tr><td align="left"><code>launch_sessions.py</code></td><td align="left">Starts 20 <code>push_script.py</code> processes, each with its own <code>MongoClient</code>.</td></tr>
   <tr><td align="left"><code>pull_script.py</code></td><td align="left">Separate consumer. Polls <code>find({_id: {$gt: bookmark}}).sort({_id: 1}).limit(100)</code> and records every poll.</td></tr>
@@ -34,7 +34,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 ### Test parameters
 
 <table width="100%">
-  <tr><th align="left">Parameter</th><th align="left">Value</th></tr>
+  <tr><th width="240" align="left">Parameter</th><th width="600" align="left">Value</th></tr>
   <tr><td align="left">Cluster</td><td align="left">MongoDB Atlas M0 (free tier), MongoDB 8.0, AWS, 3-node replica set</td></tr>
   <tr><td align="left">Client</td><td align="left">Python 3.13.14, PyMongo 4.7.3, Windows 11, one home broadband link</td></tr>
   <tr><td align="left">Producers</td><td align="left">20 processes × 1,000 documents, 100 ms sleep between inserts</td></tr>
@@ -46,7 +46,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 ### Results
 
 <table width="100%">
-  <tr><th align="left">Metric</th><th align="right">Result</th></tr>
+  <tr><th width="500" align="left">Metric</th><th width="340" align="right">Result</th></tr>
   <tr><td align="left">Documents attempted</td><td align="right">20,000</td></tr>
   <tr><td align="left">Acknowledged inserts</td><td align="right"><b>19,978</b> (99.89%)</td></tr>
   <tr><td align="left">Failed inserts</td><td align="right"><b>22</b> (0.11%): connection resets (<code>WinError 10054</code>) and timeouts</td></tr>
@@ -196,7 +196,7 @@ python oplog_replay.py && python generate_graphs.py         # report
 Each document has 3 metadata fields (`event_id`, `timestamp`, `pushed_at_epoch`) and 20 generated variables:
 
 <table width="100%">
-  <tr><th width="6%" align="center">#</th><th align="left">Field</th><th align="left">Type</th><th align="left">Range / values</th></tr>
+  <tr><th width="50" align="center">#</th><th width="210" align="left">Field</th><th width="110" align="left">Type</th><th width="470" align="left">Range / values</th></tr>
   <tr><td align="left">1</td><td align="left"><code>session_id</code></td><td align="left">int</td><td align="left">1 – 20</td></tr>
   <tr><td align="left">2</td><td align="left"><code>sequence</code></td><td align="left">int</td><td align="left">1 – 1,000 per session</td></tr>
   <tr><td align="left">3</td><td align="left"><code>device_id</code></td><td align="left">string</td><td align="left"><code>dev-{session:02d}-{seq:06d}</code></td></tr>
