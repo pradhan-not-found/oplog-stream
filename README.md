@@ -1,14 +1,13 @@
 <div align="center">
   <img src="assets/hero.svg" alt="oplog-stream" width="100%"/>
+  <br/><br/>
+  <img src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white&labelColor=1C2D38" alt="Python 3.13"/>&nbsp;
+  <img src="https://img.shields.io/badge/MongoDB_Atlas-M0_·_8.0-1F9E5A?style=flat-square&logo=mongodb&logoColor=white&labelColor=1C2D38" alt="MongoDB Atlas M0 8.0"/>&nbsp;
+  <img src="https://img.shields.io/badge/PyMongo-4.7.3-1F9E5A?style=flat-square&logo=mongodb&logoColor=white&labelColor=1C2D38" alt="PyMongo 4.7.3"/>&nbsp;
+  <img src="https://img.shields.io/badge/Sessions-20-5C6C75?style=flat-square&labelColor=1C2D38" alt="20 sessions"/>&nbsp;
+  <img src="https://img.shields.io/badge/Documents-19%2C978-5C6C75?style=flat-square&labelColor=1C2D38" alt="19,978 documents"/>
+  <br/><br/>
 </div>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.13"/>
-  <img src="https://img.shields.io/badge/MongoDB_Atlas-M0_·_8.0-47A248?style=flat-square&logo=mongodb&logoColor=white" alt="MongoDB Atlas M0 8.0"/>
-  <img src="https://img.shields.io/badge/PyMongo-4.7.3-13AA52?style=flat-square&logo=mongodb&logoColor=white" alt="PyMongo 4.7.3"/>
-  <img src="https://img.shields.io/badge/Sessions-20-1C2D38?style=flat-square" alt="20 sessions"/>
-  <img src="https://img.shields.io/badge/Documents-19%2C978-1C2D38?style=flat-square" alt="19,978 documents"/>
-</p>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
 
