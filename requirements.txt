@@ -1,0 +1,4 @@
+pymongo[srv]==4.7.3
+python-dotenv==1.0.1
+faker==24.11.0
+rich==13.7.1
