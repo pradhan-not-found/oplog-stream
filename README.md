@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/banner.svg" alt="oplog-stream" width="100%"/>
+  <img src="assets/hero.svg" alt="oplog-stream" width="100%"/>
 </div>
 
 <br/>
@@ -22,7 +22,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 
 <img src="assets/section_architecture.svg" alt="Architecture" width="100%"/>
 
-<img src="assets/architecture.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
+<img src="assets/architecture-flow.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
 
 | Component | Role |
 |:--|:--|
@@ -76,7 +76,7 @@ The cluster metrics were sampled every second from `serverStatus` by `atlas_moni
 
 ### Oplog
 
-<img src="assets/graph_oplog.svg" width="100%" alt="Oplog insert entries per second"/>
+<img src="assets/charts/oplog.svg" width="100%" alt="Oplog insert entries per second"/>
 
 This chart is the most complete view of the run. After the run, `oplog_replay.py` opened a change stream with `startAtOperationTime` set to the run start, and the server replayed every oplog entry for `event_streaming.sensor_events`.
 
@@ -86,45 +86,45 @@ This chart is the most complete view of the run. After the run, `oplog_replay.py
 
 ### Opcounters
 
-<img src="assets/graph_opcounters.svg" width="100%" alt="Opcounters"/>
+<img src="assets/charts/opcounters.svg" width="100%" alt="Opcounters"/>
 
 Inserts climb from 0 to about 60/s within two seconds of launch: the 20 processes start within 2.7 s of each other. Reads (`query` + `getMore`) stay at about 4/s, made up of the pull consumer's polls plus the monitor's change stream. The `serverStatus` line has a long gap between 06:06:50 and 06:13:00. In that window the monitor lost its connection during an outage, exited, and was restarted. The oplog chart above covers that window in full.
 
 ### Connections
 
-<img src="assets/graph_connections.svg" width="100%" alt="Connections"/>
+<img src="assets/charts/connections.svg" width="100%" alt="Connections"/>
 
 The count rose from 43 to about 100 when the 20 producers connected. Each `MongoClient` holds an application socket plus monitoring connections to every node. After the network resets, the count climbed to **204**. Clients opened new sockets while the server had not yet expired the old ones, and the count fell back toward 120 only once the orphaned sockets timed out. That is still far below the M0 limit of 500, but it shows that each reset briefly doubles connection usage.
 
 ### Network
 
-<img src="assets/graph_network.svg" width="100%" alt="Network"/>
+<img src="assets/charts/network.svg" width="100%" alt="Network"/>
 
 Bytes in averaged 38 KB/s, consistent with about 46 inserts/s of documents averaging about 0.8 KB on the wire. Bytes out (82 KB/s) is higher than bytes in. The change stream and the pull consumer each read every document back, so in this test reads cost more bandwidth than writes.
 
 ### Replication lag
 
-<img src="assets/graph_replication_lag.svg" width="100%" alt="Replication lag"/>
+<img src="assets/charts/replication_lag.svg" width="100%" alt="Replication lag"/>
 
 Lag is the difference between the primary's and a secondary's `lastWriteDate`, taken from the driver's 500 ms heartbeats. Atlas reports `lastWriteDate` in whole seconds, so this is a coarse measure. While the client was connected, the median lag was **0 s** and the p95 was **1 s**. The 12 s and 24 s spikes coincide with the outage windows. They show the driver holding a stale heartbeat for a node it could not reach, not secondaries actually falling behind.
 
 ### Pull consumer
 
-<img src="assets/graph_query_latency.svg" width="100%" alt="Pull consumer query time"/>
+<img src="assets/charts/query_latency.svg" width="100%" alt="Pull consumer query time"/>
 
-<img src="assets/graph_end_to_end.svg" width="100%" alt="End-to-end delay"/>
+<img src="assets/charts/end_to_end.svg" width="100%" alt="End-to-end delay"/>
 
 When the network was healthy, a poll took about 265 ms round trip and a document reached the consumer about 1 s after it was created: half a poll interval plus one round trip. After each outage the consumer had a backlog. The end-to-end delay rose to 20–50 s while it drained, which is what pushes the p95 to 39.7 s.
 
 ### Insert latency by session
 
-<img src="assets/graph_session_latency.svg" width="100%" alt="insert_one latency by session"/>
+<img src="assets/charts/session_latency.svg" width="100%" alt="insert_one latency by session"/>
 
 All 20 sessions behaved the same way: p50 between 93 and 121 ms, p95 between 702 and 821 ms. No session was starved and there were no hot spots. The roughly 7× gap between p50 and p95 comes from majority-write acknowledgment across the replica set, combined with the shared-tier (M0) proxy.
 
 ### Data integrity
 
-<img src="assets/graph_status_dist.svg" width="100%" alt="status field distribution"/>
+<img src="assets/charts/status_dist.svg" width="100%" alt="status field distribution"/>
 
 | Field | Expected mean | Observed mean |
 |:--|--:|--:|

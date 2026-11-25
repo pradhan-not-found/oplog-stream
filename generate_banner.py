@@ -1,6 +1,6 @@
 """
 generate_banner.py
-Renders assets/banner.svg: a light, minimal banner set in Instrument Sans
+Renders assets/hero.svg: a light, minimal banner set in Instrument Sans
 (embedded) with a pixel-mosaic arch.
 
 The arch is a grid of squares inside concentric bands; outer bands are dense
@@ -84,5 +84,5 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{
   {glyph}
 </svg>
 """
-(ROOT / "assets" / "banner.svg").write_text(svg, encoding="utf-8")
+(ROOT / "assets" / "hero.svg").write_text(svg, encoding="utf-8")
 print(f"[OK] assets/banner.svg ({len(cells)} cells)")

@@ -10,7 +10,7 @@ Inputs  (written by the run):
     results/session_XX.json      push_script.py    - per-session insert stats
 
 Outputs:
-    assets/graph_*.svg
+    assets/charts/*.svg
     results/summary.json         every headline number quoted in the README
 
 Nothing here is synthesised: if an input is missing, that chart is skipped.
@@ -172,8 +172,8 @@ def annotate(x, y, xmax, ymax, text, anchor="start") -> str:
 
 
 def save(name: str, svg: str) -> None:
-    (ASSETS / name).write_text(svg, encoding="utf-8")
-    print(f"[OK] assets/{name}")
+    (ASSETS / "charts" / name.replace("graph_", "")).write_text(svg, encoding="utf-8")
+    print(f"[OK] assets/charts/{name.replace('graph_', '')}")
 
 
 # ---------------------------------------------------------------- charts

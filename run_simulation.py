@@ -7,7 +7,7 @@ One-command real test against MongoDB Atlas:
   2. pull_script.py     - separate consumer process, records every poll (background)
   3. launch_sessions.py - 20 concurrent push_script.py sessions          (foreground)
   4. oplog_replay.py   - re-reads the run window from local.oplog.rs
-  5. generate_graphs.py - renders assets/graph_*.svg + results/summary.json
+  5. generate_graphs.py - renders assets/charts/*.svg + results/summary.json
 
 Usage:
     python run_simulation.py --sessions 20 --total 1000 --interval 0.1
@@ -78,7 +78,7 @@ def main() -> None:
 
     subprocess.run([py, "oplog_replay.py"], cwd=ROOT, env=ENV, check=False)
     subprocess.run([py, "generate_graphs.py"], cwd=ROOT, env=ENV, check=False)
-    print("[run] done -> results/summary.json, assets/graph_*.svg")
+    print("[run] done -> results/summary.json, assets/charts/*.svg")
 
 
 if __name__ == "__main__":
