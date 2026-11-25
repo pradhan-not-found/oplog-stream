@@ -1,7 +1,18 @@
 <div align="center">
   <img src="assets/hero.svg" alt="oplog-stream" width="100%"/>
-  <img src="assets/stack-bar.svg" alt="Python 3.13 · MongoDB Atlas M0 8.0 · PyMongo 4.7.3 · 20 sessions · 19,978 documents written" width="100%"/>
 </div>
+
+<p align="center">
+  <img src="assets/logos/python.svg" height="18" alt="Python" align="absmiddle"/>&nbsp; <b>Python 3.13</b>
+  &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/mongodb.svg" height="18" alt="MongoDB" align="absmiddle"/>&nbsp; <b>MongoDB Atlas</b> M0 · 8.0
+  &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/pymongo.svg" height="18" alt="PyMongo" align="absmiddle"/>&nbsp; <b>PyMongo 4.7.3</b>
+</p>
+
+<p align="center">
+  20 concurrent sessions &nbsp;·&nbsp; 19,978 documents written &nbsp;·&nbsp; 0.11% write errors &nbsp;·&nbsp; insert p50 107.5 ms
+</p>
 
 <img src="assets/section_overview.svg" alt="Overview" width="100%"/>
 
@@ -11,7 +22,7 @@ Every chart and number in this README comes from one recorded run on 25 November
 
 <img src="assets/section_architecture.svg" alt="Architecture" width="100%"/>
 
-<img src="assets/architecture-pipeline.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
+<img src="assets/architecture-detail.svg" alt="Architecture: 20 push sessions, Atlas replica set, pull consumer, observer" width="100%"/>
 
 | Component | Role |
 |:--|:--|
@@ -222,7 +233,7 @@ oplog-stream/
 ├── generate_banner.py    banner
 ├── generate_headers.py   section heading strips
 ├── generate_architecture.py  architecture diagram
-├── generate_stats_strip.py   stack and run figures strip
+├── generate_logos.py     tech logos for the header row
 ├── mosaic.py             pixel-mosaic arch shared by banner and strips
 ├── svg_theme.py          palette and embedded Instrument Sans
 ├── results/              raw data from the recorded run

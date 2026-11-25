@@ -1,118 +1,127 @@
 """
 generate_architecture.py
-Renders assets/architecture-pipeline.svg: a 3 x 2 grid of identical cards.
-
-  row 1 (data path):     Producers  ->  Atlas primary  ->  Pull consumer
-  row 2 (oplog path):    Secondaries <-  Oplog         ->  Observer
+Renders assets/architecture-detail.svg: push environment -> Atlas replica set ->
+pull environment, plus the observer. Grey surface, white cards, Instrument Sans.
 
 Run: python generate_architecture.py
 """
 from pathlib import Path
 
-from svg_theme import (MONGODB_GREEN, MONGODB_PATH, PYTHON_BLUE, PYTHON_PATH,
-                       style_block)
+from svg_theme import style_block
 
 ROOT = Path(__file__).parent
-W, H = 1500, 470
+W, H = 1500, 690
 BG = "#EDEEEB"
 CARD = "#FFFFFF"
-STROKE = "#DCDFDA"
+LINE = "#D5D8D3"
 INK = "#14201B"
-INK_2 = "#5B6661"
-INK_3 = "#8A948F"
-LINK = "#9AA39E"
-CHIP_GREEN = "#E6F4EC"
-CHIP_BLUE = "#E7EFF8"
-CHIP_GREY = "#F0F1EE"
+INK_2 = "#3D4A44"
+INK_3 = "#7C8781"
 GREEN = "#1F9E5A"
-
-CW, CH = 330, 116                      # card size
-COLS = [125, 585, 1045]                # card x
-ROWS = [96, 306]                      # card y
-p: list[str] = []
-
-
-def glyph(kind: str, x: float, y: float) -> str:
-    """44x44 chip with a 24px icon centred."""
-    chip = {"python": CHIP_BLUE, "mongodb": CHIP_GREEN, "oplog": CHIP_GREEN}.get(kind, CHIP_GREY)
-    out = f'<rect x="{x}" y="{y}" width="44" height="44" rx="11" fill="{chip}"/>'
-    ix, iy = x + 10, y + 10
-    if kind == "python":
-        out += f'<path transform="translate({ix},{iy})" d="{PYTHON_PATH}" fill="{PYTHON_BLUE}"/>'
-    elif kind == "mongodb":
-        out += f'<path transform="translate({ix},{iy})" d="{MONGODB_PATH}" fill="{MONGODB_GREEN}"/>'
-    elif kind == "grid":
-        out += "".join(f'<rect x="{ix + 1 + c * 6}" y="{iy + 1 + r * 6}" width="4.4" height="4.4" rx="0.8" fill="{GREEN}"/>'
-                       for r in range(4) for c in range(4))
-    elif kind == "oplog":  # stacked log lines
-        out += "".join(f'<rect x="{ix + 2}" y="{iy + 3 + i * 6}" width="{20 - (i % 2) * 6}" height="3" rx="1.5" fill="{GREEN}"/>'
-                       for i in range(4))
-    elif kind == "replica":  # two linked nodes
-        out += (f'<circle cx="{ix + 6}" cy="{iy + 12}" r="4.5" fill="none" stroke="{INK_2}" stroke-width="1.8"/>'
-                f'<circle cx="{ix + 18}" cy="{iy + 12}" r="4.5" fill="none" stroke="{INK_2}" stroke-width="1.8"/>'
-                f'<path d="M{ix + 10.5},{iy + 12} H{ix + 13.5}" stroke="{INK_2}" stroke-width="1.8"/>')
-    elif kind == "observer":  # pulse line
-        out += (f'<path d="M{ix},{iy + 13} h5 l3,-7 l4,14 l3,-9 l2,2 h7" fill="none" stroke="{INK_2}" '
-                f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
-    return out
+GREEN_SOFT = "#E3F3E9"
+BLUE = "#3D7FE0"
+BLUE_SOFT = "#E6EEFB"
+GREY_FLOW = "#9AA39E"
 
 
-def card(col: int, row: int, kind: str, eyebrow: str, title: str, caption: str) -> None:
-    x, y = COLS[col], ROWS[row]
-    p.append(f'<rect x="{x}" y="{y}" width="{CW}" height="{CH}" rx="16" fill="{CARD}" stroke="{STROKE}" filter="url(#lift)"/>')
-    p.append(glyph(kind, x + 24, y + 24))
-    p.append(f'<text x="{x + 84}" y="{y + 38}" font-size="11.5" font-weight="600" letter-spacing="1.3" fill="{INK_3}">{eyebrow}</text>')
-    p.append(f'<text x="{x + 84}" y="{y + 64}" font-size="19" font-weight="500" fill="{INK}">{title}</text>')
-    p.append(f'<text x="{x + 24}" y="{y + 96}" font-size="13.5" fill="{INK_2}">{caption}</text>')
+def card(x, y, w, h, label, sub=""):
+    s = (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{CARD}" stroke="{LINE}"/>'
+         f'<text x="{x + 24}" y="{y + 36}" font-size="13" font-weight="600" letter-spacing="1.2" fill="{INK_3}">{label}</text>')
+    if sub:
+        s += f'<text x="{x + 24}" y="{y + 56}" font-size="13" fill="{INK_3}">{sub}</text>'
+    return s
 
 
-def link(x1, y1, x2, y2, text, dashed=False):
-    dash = ' stroke-dasharray="3 5"' if dashed else ""
-    p.append(f'<path d="M{x1},{y1} L{x2},{y2}" stroke="{LINK}" stroke-width="1.5"{dash} marker-end="url(#head)"/>')
-    p.append(f'<circle cx="{x1}" cy="{y1}" r="3" fill="{LINK}"/>')
-    if text:
-        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-        w = 7.2 * len(text) + 22
-        p.append(f'<rect x="{mx - w / 2:.1f}" y="{my - 13}" width="{w:.1f}" height="26" rx="13" fill="{BG}" stroke="{STROKE}"/>')
-        p.append(f'<text x="{mx:.1f}" y="{my + 4.5}" font-size="12.5" fill="{INK_2}" text-anchor="middle">{text}</text>')
+def node(x, y, w, h, title, sub, fill, stroke, mono=False):
+    fam = "font-family=\"ui-monospace, 'SFMono-Regular', Consolas, monospace\"" if mono else ""
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{fill}" stroke="{stroke}"/>'
+            f'<text x="{x + 16}" y="{y + 26}" font-size="15" font-weight="600" fill="{INK}" {fam}>{title}</text>'
+            f'<text x="{x + 16}" y="{y + 46}" font-size="12.5" fill="{INK_2}">{sub}</text>')
 
 
-# column headers
-for x, t in zip(COLS, ("PUSH ENVIRONMENT", "MONGODB ATLAS", "PULL ENVIRONMENT")):
-    p.append(f'<text x="{x}" y="58" font-size="12" font-weight="600" letter-spacing="1.6" fill="{INK_3}">{t}</text>')
-p.append(f'<line x1="125" y1="70" x2="1375" y2="70" stroke="{STROKE}"/>')
+def arrow(d, color, label="", lx=0, ly=0, dashed=False, anchor="middle"):
+    """Thin connector: rounded caps, start dot, open chevron head, pill label."""
+    dash = ' stroke-dasharray="4 5"' if dashed else ""
+    start = d.split()[0][1:].split(",")
+    s = (f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.6"{dash} '
+         f'stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-{color[1:]})"/>'
+         f'<circle cx="{start[0]}" cy="{start[1]}" r="3" fill="{color}"/>')
+    if label:
+        w = 7.0 * len(label) + 20
+        x0 = lx - w / 2 if anchor == "middle" else (lx - w + 10 if anchor == "end" else lx - 10)
+        s += (f'<rect x="{x0:.1f}" y="{ly - 16}" width="{w:.1f}" height="24" rx="12" '
+              f'fill="{BG}" stroke="{LINE}"/>'
+              f'<text x="{x0 + w / 2:.1f}" y="{ly}" font-size="12.5" fill="{INK_2}" text-anchor="middle">{label}</text>')
+    return s
 
-# row 1 - data path
-card(0, 0, "grid", "20 PROCESSES", "Producers", "push_script.py  ·  20-variable documents")
-card(1, 0, "mongodb", "REPLICA SET PRIMARY", "Atlas M0", "event_streaming.sensor_events")
-card(2, 0, "python", "SEPARATE PROCESS", "Pull consumer", "pull_script.py  ·  _id bookmark polling")
-# row 2 - oplog path
-card(0, 1, "replica", "2 NODES", "Secondaries", "apply oplog entries asynchronously")
-card(1, 1, "oplog", "LOCAL.OPLOG.RS", "Oplog", "one insert entry per acknowledged write")
-card(2, 1, "observer", "OBSERVER", "Monitor + replay", "atlas_monitor.py  ·  oplog_replay.py")
 
-g = 130  # horizontal gap between cards
-link(COLS[0] + CW, ROWS[0] + CH / 2, COLS[1] - 6, ROWS[0] + CH / 2, "insert_one")
-link(COLS[1] + CW, ROWS[0] + CH / 2, COLS[2] - 6, ROWS[0] + CH / 2, "find  ·  1 s")
-link(COLS[1] + CW / 2, ROWS[0] + CH, COLS[1] + CW / 2, ROWS[1] - 6, "")
-link(COLS[1], ROWS[1] + CH / 2, COLS[0] + CW + 6, ROWS[1] + CH / 2, "replicate", dashed=True)
-link(COLS[1] + CW, ROWS[1] + CH / 2, COLS[2] - 6, ROWS[1] + CH / 2, "change stream", dashed=True)
+def marker(color):
+    return (f'<marker id="arrow-{color[1:]}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" '
+            f'markerHeight="7" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" '
+            f'stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>')
+
+
+parts = []
+
+# ---- push environment ------------------------------------------------------
+parts.append(card(40, 40, 430, 610, "PUSH ENVIRONMENT", "launch_sessions.py starts 20 processes"))
+for i in range(20):
+    r, c = divmod(i, 4)
+    x, y = 64 + c * 98, 124 + r * 66
+    parts.append(f'<rect x="{x}" y="{y}" width="86" height="54" rx="7" fill="{GREEN_SOFT}" stroke="{GREEN}" stroke-opacity="0.45"/>'
+                 f'<text x="{x + 43}" y="{y + 24}" font-size="13" font-weight="600" fill="{INK}" text-anchor="middle">session {i + 1:02d}</text>'
+                 f'<text x="{x + 43}" y="{y + 42}" font-size="11" fill="{INK_3}" text-anchor="middle">push_script</text>')
+parts.append(f'<text x="64" y="488" font-size="13" fill="{INK_2}">One MongoClient per process</text>'
+             f'<text x="64" y="508" font-size="13" fill="{INK_2}">20-variable document per loop iteration</text>'
+             f'<text x="64" y="528" font-size="13" fill="{INK_2}">insert_one, w: majority, 100 ms sleep</text>'
+             f'<line x1="64" y1="556" x2="446" y2="556" stroke="{LINE}"/>'
+             f'<text x="64" y="594" font-size="24" font-weight="600" fill="{INK}">19,978</text>'
+             f'<text x="64" y="616" font-size="12" fill="{INK_3}">acknowledged inserts</text>'
+             f'<text x="230" y="594" font-size="24" font-weight="600" fill="{INK}">107 ms</text>'
+             f'<text x="230" y="616" font-size="12" fill="{INK_3}">insert p50</text>'
+             f'<text x="352" y="594" font-size="24" font-weight="600" fill="{INK}">22</text>'
+             f'<text x="352" y="616" font-size="12" fill="{INK_3}">failed</text>')
+
+# ---- atlas -------------------------------------------------------------------
+parts.append(card(560, 40, 400, 610, "MONGODB ATLAS", "M0 · MongoDB 8.0 · 3-node replica set"))
+parts.append(node(590, 124, 340, 62, "Primary", "event_streaming.sensor_events", "#FFFFFF", GREEN))
+parts.append(node(590, 218, 340, 62, "local.oplog.rs", "1 insert entry per write · 19,978 in run", GREEN_SOFT, GREEN, mono=True))
+parts.append(node(590, 360, 160, 62, "Secondary", "node 00", "#FFFFFF", LINE))
+parts.append(node(770, 360, 160, 62, "Secondary", "node 02", "#FFFFFF", LINE))
+parts.append(arrow("M760,186 V212", GREEN))
+parts.append(arrow("M700,280 V354", GREY_FLOW, "replicate", 760, 322, dashed=True))
+parts.append(arrow("M820,280 V354", GREY_FLOW, "", dashed=True))
+parts.append(f'<line x1="584" y1="462" x2="936" y2="462" stroke="{LINE}"/>'
+             f'<text x="590" y="494" font-size="13" fill="{INK_2}">Replication lag p50 0 s, p95 1 s</text>'
+             f'<text x="590" y="514" font-size="13" fill="{INK_2}">Connections 43 → 204 at peak (limit 500)</text>'
+             f'<text x="590" y="534" font-size="13" fill="{INK_2}">Steady 46 inserts/s, peak 90/s</text>')
+
+# ---- pull + observer -------------------------------------------------------
+parts.append(card(1050, 40, 410, 280, "PULL ENVIRONMENT", "separate process"))
+parts.append(node(1074, 124, 362, 62, "pull_script.py", "find(_id > bookmark).sort(_id).limit(100)", BLUE_SOFT, BLUE, mono=True))
+parts.append(f'<text x="1074" y="232" font-size="24" font-weight="600" fill="{INK}">79.8%</text>'
+             f'<text x="1074" y="254" font-size="12" fill="{INK_3}">of documents received</text>'
+             f'<text x="1220" y="232" font-size="24" font-weight="600" fill="{INK}">1.05 s</text>'
+             f'<text x="1220" y="254" font-size="12" fill="{INK_3}">push → pull p50</text>'
+             f'<text x="1074" y="292" font-size="12.5" fill="{INK_2}">ObjectId order ≠ commit order across 20 clients</text>')
+
+parts.append(card(1050, 370, 410, 280, "OBSERVER", "metrics and oplog evidence"))
+parts.append(node(1074, 454, 362, 62, "atlas_monitor.py", "serverStatus · change stream · heartbeats, 1 s", "#FFFFFF", LINE, mono=True))
+parts.append(node(1074, 540, 362, 62, "oplog_replay.py", "startAtOperationTime → 100% of entries", GREEN_SOFT, GREEN, mono=True))
+
+# ---- flows -----------------------------------------------------------------------
+parts.append(arrow("M470,250 C525,250 530,155 584,155", GREEN, "insert_one", 515, 145))
+parts.append(arrow("M930,155 C990,155 1000,155 1068,155", BLUE, "poll every 1 s", 999, 145))
+parts.append(arrow("M930,249 C990,249 990,571 1068,571", GREY_FLOW, "change stream", 996, 350, dashed=True, anchor="start"))
 
 svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="oplog-stream architecture">
   <title>oplog-stream architecture</title>
-  <desc>Twenty producers insert into the Atlas primary; a separate consumer polls it. Each write becomes one oplog entry, which secondaries replicate and an observer reads through a change stream.</desc>
+  <desc>20 producer sessions insert into the Atlas primary; the oplog replicates to two secondaries; a separate pull consumer polls by _id; an observer samples metrics and replays the oplog.</desc>
   {style_block()}
-  <defs>
-    <filter id="lift" x="-10%" y="-20%" width="120%" height="150%">
-      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#14201B" flood-opacity="0.07"/>
-    </filter>
-    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M1,1 L9,5 L1,9" fill="none" stroke="{LINK}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    </marker>
-  </defs>
+  <defs>{marker(GREEN)}{marker(BLUE)}{marker(GREY_FLOW)}</defs>
   <rect width="{W}" height="{H}" fill="{BG}"/>
-  {''.join(p)}
+  {''.join(parts)}
 </svg>
 """
-(ROOT / "assets" / "architecture-pipeline.svg").write_text(svg, encoding="utf-8")
-print("[OK] assets/architecture-pipeline.svg")
+(ROOT / "assets" / "architecture-detail.svg").write_text(svg, encoding="utf-8")
+print("[OK] assets/architecture-detail.svg")
