@@ -9,12 +9,14 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import random
 import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 from pymongo import MongoClient, errors
@@ -113,6 +115,7 @@ def run_push(collection: Collection, session_id: int,
     """Push `total` documents to MongoDB, sleeping `interval` seconds between each."""
 
     stats = {"success": 0, "failed": 0, "start": time.time()}
+    latencies_ms: list[float] = []
 
     console.rule(f"[bold cyan]Session {session_id:02d} — Push started[/]")
 
@@ -136,7 +139,9 @@ def run_push(collection: Collection, session_id: int,
         for seq in range(1, total + 1):
             doc = generate_document(session_id, seq)
             try:
+                t_ins = time.perf_counter()
                 collection.insert_one(doc)
+                latencies_ms.append((time.perf_counter() - t_ins) * 1000.0)
                 stats["success"] += 1
             except errors.PyMongoError as exc:
                 stats["failed"] += 1
@@ -161,6 +166,25 @@ def run_push(collection: Collection, session_id: int,
     table.add_row("Elapsed time",    f"{elapsed:.2f} s")
     table.add_row("Insert rate",     f"{rate:.2f} docs/s")
     console.print(table)
+
+    # Machine-readable summary for the simulation report
+    lat = sorted(latencies_ms)
+    pct = lambda q: round(lat[min(len(lat) - 1, int(q * len(lat)))], 2) if lat else None
+    results_dir = Path(__file__).parent / "results"
+    results_dir.mkdir(exist_ok=True)
+    with open(results_dir / f"session_{session_id:02d}.json", "w", encoding="utf-8") as fh:
+        json.dump({
+            "session_id": session_id,
+            "total": total,
+            "success": stats["success"],
+            "failed": stats["failed"],
+            "start_epoch": stats["start"],
+            "elapsed_s": round(elapsed, 3),
+            "rate_docs_s": round(rate, 3),
+            "insert_ms": {"min": pct(0), "p50": pct(0.50), "p95": pct(0.95),
+                          "p99": pct(0.99), "max": pct(1.0),
+                          "mean": round(sum(lat) / len(lat), 2) if lat else None},
+        }, fh, indent=2)
 
 
 # ---------------------------------------------------------------------------

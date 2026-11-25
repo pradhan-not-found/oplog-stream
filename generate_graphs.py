@@ -1,367 +1,490 @@
 """
 generate_graphs.py
-Generates clean MongoDB Atlas-style dark-theme SVG metric graphs for README.md.
+==================
+Renders the README charts from the data recorded during a real test run.
+
+Inputs  (written by the run):
+    results/metrics.jsonl        atlas_monitor.py  - 1 s cluster samples
+    results/pull_polls.jsonl     pull_script.py    - one line per poll
+    results/pull_summary.json    pull_script.py    - consumer totals
+    results/session_XX.json      push_script.py    - per-session insert stats
+
+Outputs:
+    assets/graph_*.svg
+    results/summary.json         every headline number quoted in the README
+
+Nothing here is synthesised: if an input is missing, that chart is skipped.
 Run: python generate_graphs.py
 """
-import math
-import os
-import random
+from __future__ import annotations
 
-random.seed(42)
-os.makedirs("assets", exist_ok=True)
+import json
+import statistics
+from pathlib import Path
 
-# Atlas dark UI palette (matching MongoDB Atlas dashboard)
-W, H = 800, 260
-PL, PR, PT, PB = 62, 26, 62, 42
-PW = W - PL - PR
-PH = H - PT - PB
+from svg_theme import (AXIS, BG, BORDER, CRITICAL, GOOD, GRID, INK_MUTED,
+                       INK_PRIMARY, INK_SECONDARY, NEUTRAL, S1, S2, S3,
+                       WARNING, style_block)
 
-BG = "#001E2B"
-BORDER = "#1C2D38"
-GRID = "#112B38"
-AXIS_COL = "#233B47"
-DIM = "#7A939E"
-BRIGHT = "#C1CED4"
-TITLE_C = "#F9FBFA"
+ROOT = Path(__file__).parent
+RES = ROOT / "results"
+ASSETS = ROOT / "assets"
 
-GREEN = "#00ED64"
-BLUE = "#016BF8"
-CYAN = "#00D2FF"
-AMBER = "#FFC010"
-RED = "#FF6B6B"
-
-FONT = "'Instrument Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+W, H = 860, 300
+PL, PR, PT, PB = 70, 28, 78, 44
+PW, PH = W - PL - PR, H - PT - PB
+SMOOTH = 5  # seconds, centred moving average for 1 s samples
 
 
-def sx(t: float, tmax: float) -> float:
-    return PL + (t / tmax) * PW
+# ---------------------------------------------------------------- loading
+def load_jsonl(name: str) -> list[dict]:
+    p = RES / name
+    if not p.exists():
+        return []
+    return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def sy(v: float, vmin: float, vmax: float) -> float:
-    return PT + PH - ((v - vmin) / (vmax - vmin)) * PH
+def load_json(name: str):
+    p = RES / name
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
-def line_path(pts: list[tuple[float, float]]) -> str:
-    if len(pts) < 2:
-        return ""
-    return "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+def smooth(vals: list[float], k: int = SMOOTH) -> list[float]:
+    h = k // 2
+    out = []
+    for i in range(len(vals)):
+        win = vals[max(0, i - h): i + h + 1]
+        out.append(sum(win) / len(win))
+    return out
 
 
-def area_path(pts: list[tuple[float, float]], y_bot: float) -> str:
-    if len(pts) < 2:
-        return ""
-    return line_path(pts) + f" L {pts[-1][0]:.1f},{y_bot:.1f} L {pts[0][0]:.1f},{y_bot:.1f} Z"
+def pct(vals: list[float], q: float) -> float:
+    s = sorted(vals)
+    return s[min(len(s) - 1, int(q * len(s)))] if s else 0.0
 
 
-def yticks(vmin: float, vmax: float, count: int = 4) -> list[float]:
-    step = (vmax - vmin) / count
-    return [vmin + i * step for i in range(count + 1)]
+def nice_max(v: float) -> float:
+    if v <= 0:
+        return 1.0
+    import math
+    exp = 10 ** math.floor(math.log10(v))
+    for m in (1, 1.2, 1.6, 2, 2.4, 3.2, 4, 6, 8, 10):
+        if v <= m * exp:
+            return m * exp
+    return 10 * exp
 
 
-def build_svg(
-    card_id: str,
-    title: str,
-    legend_items: list[tuple[str, str, str]],
-    body: str,
-    subtitle: str = "",
-) -> str:
-    # Right-aligned legend stacked cleanly in header
-    leg_svg = ""
-    ry = 24
-    for label, value_str, color in legend_items:
-        leg_svg += (
-            f'  <circle cx="{W - 185}" cy="{ry - 4}" r="4.5" fill="{color}"/>\n'
-            f'  <text x="{W - 174}" y="{ry}" font-family="{FONT}" font-size="11.5" fill="{DIM}">{label}</text>\n'
-            f'  <text x="{W - 24}" y="{ry}" font-family="{FONT}" font-size="11.5" font-weight="600" fill="{TITLE_C}" text-anchor="end">{value_str}</text>\n'
+def fmt_num(v: float, unit: str = "") -> str:
+    if abs(v) >= 100 or float(v).is_integer():
+        s = f"{v:,.0f}"
+    elif abs(v) >= 10:
+        s = f"{v:.1f}"
+    else:
+        s = f"{v:.2f}".rstrip("0").rstrip(".")
+    return s + unit
+
+
+T0_EPOCH = 0.0  # set from the first monitor sample
+
+
+def fmt_clock(sec: float) -> str:
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(T0_EPOCH + sec, tz=timezone.utc).strftime("%H:%M:%S")
+
+
+# ---------------------------------------------------------------- frame
+def frame(title: str, subtitle: str, legend: list[tuple[str, str, str]], body: str,
+          desc: str) -> str:
+    leg = ""
+    x = W - PR
+    # right-aligned legend chips, laid out right-to-left
+    items = []
+    for label, value, color in reversed(legend):
+        w_val = 7.0 * len(value) + 4
+        w_lab = 6.4 * len(label) + 4
+        x_val_end = x
+        x_lab_end = x - w_val - 6
+        x_dot = x_lab_end - w_lab - 8
+        items.append(
+            f'<circle cx="{x_dot:.1f}" cy="29" r="4.5" fill="{color}"/>'
+            f'<text x="{x_lab_end:.1f}" y="33" font-size="12" fill="{INK_MUTED}" text-anchor="end">{label}</text>'
+            f'<text x="{x_val_end:.1f}" y="33" font-size="12" font-weight="600" fill="{INK_PRIMARY}" text-anchor="end">{value}</text>'
         )
-        ry += 18
-
-    sub_svg = ""
-    if subtitle:
-        sub_svg = f'  <text x="24" y="45" font-family="{FONT}" font-size="11" fill="{DIM}">{subtitle}</text>\n'
-
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-  <defs>
-    <linearGradient id="grad_{card_id}_1" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{GREEN}" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="{GREEN}" stop-opacity="0.0"/>
-    </linearGradient>
-    <linearGradient id="grad_{card_id}_blue" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{CYAN}" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="{CYAN}" stop-opacity="0.0"/>
-    </linearGradient>
-    <linearGradient id="grad_{card_id}_amber" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{AMBER}" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="{AMBER}" stop-opacity="0.0"/>
-    </linearGradient>
-  </defs>
-  <rect width="{W}" height="{H}" fill="{BG}" rx="10"/>
-  <rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" fill="none" stroke="{BORDER}" stroke-width="1" rx="10"/>
-
-  <!-- Card Header -->
-  <circle cx="29" cy="24" r="6" fill="none" stroke="{DIM}" stroke-width="1.2"/>
-  <text x="29" y="27.5" font-family="{FONT}" font-size="9" font-weight="700" fill="{DIM}" text-anchor="middle">i</text>
-  <text x="42" y="28" font-family="{FONT}" font-size="14" font-weight="600" fill="{TITLE_C}">{title}</text>
-{sub_svg}{leg_svg}
+        x = x_dot - 18
+    leg = "\n  ".join(items)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="{title}">
+  <title>{title}</title>
+  <desc>{desc}</desc>
+  {style_block()}
+  <rect width="{W}" height="{H}" rx="10" fill="{BG}"/>
+  <rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="10" fill="none" stroke="{BORDER}"/>
+  <circle cx="31" cy="29" r="7" fill="none" stroke="{INK_MUTED}" stroke-width="1.3"/>
+  <rect x="30.3" y="27.2" width="1.4" height="5.4" fill="{INK_MUTED}"/>
+  <circle cx="31" cy="25.2" r="0.9" fill="{INK_MUTED}"/>
+  <text x="46" y="34" font-size="15" font-weight="600" fill="{INK_PRIMARY}">{title}</text>
+  <text x="46" y="54" font-size="11.5" fill="{INK_MUTED}">{subtitle}</text>
+  <text x="{W - PR}" y="54" font-size="11" fill="{INK_MUTED}" text-anchor="end">Granularity: 1 s  ·  Time zone: UTC</text>
+  {leg}
 {body}
 </svg>
 """
 
 
-def render_series(
-    card_id: str,
-    tmax: float,
-    vmin: float,
-    vmax: float,
-    x_labels: list[tuple[float, str]],
-    series_list: list[tuple[list[tuple[float, float]], str, str]],
-    unit_fmt: str = "{:.0f}",
-    limit_line: tuple[float, str] | None = None,
-) -> str:
-    b = ""
-    ybot = sy(vmin, vmin, vmax)
-
-    for v in yticks(vmin, vmax, 4):
-        y = sy(v, vmin, vmax)
-        lbl = unit_fmt.format(v)
-        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W - PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
-        b += f'  <text x="{PL - 10}" y="{y + 3.5:.1f}" font-family="{FONT}" font-size="10.5" fill="{DIM}" text-anchor="end">{lbl}</text>\n'
-
-    for t, lbl in x_labels:
-        x = sx(t, tmax)
-        is_now = lbl == "Now"
-        anchor = "end" if is_now else ("start" if t == 0 else "middle")
-        col = BRIGHT if is_now else DIM
-        fw = "600" if is_now else "400"
-        b += f'  <text x="{x:.1f}" y="{PT + PH + 20}" font-family="{FONT}" font-size="10.5" font-weight="{fw}" fill="{col}" text-anchor="{anchor}">{lbl}</text>\n'
-
-    b += f'  <line x1="{PL}" y1="{PT + PH}" x2="{W - PR}" y2="{PT + PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
-
-    if limit_line is not None:
-        lv, ltxt = limit_line
-        ly = sy(lv, vmin, vmax)
-        b += f'  <line x1="{PL}" y1="{ly:.1f}" x2="{W - PR}" y2="{ly:.1f}" stroke="{DIM}" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>\n'
-        b += f'  <text x="{W - PR}" y="{ly - 5:.1f}" font-family="{FONT}" font-size="10" fill="{DIM}" text-anchor="end">{ltxt}</text>\n'
-
-    for ts_vals, color, grad_ref in series_list:
-        pts = [(sx(t, tmax), sy(v, vmin, vmax)) for t, v in ts_vals]
-        if grad_ref:
-            b += f'  <path d="{area_path(pts, ybot)}" fill="url(#{grad_ref})"/>\n'
-        b += f'  <path d="{line_path(pts)}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>\n'
-
-    return b
+def axes(xmax: float, ymax: float, yfmt, xfmt=fmt_clock, xticks: int = 6) -> str:
+    b = []
+    for i in range(5):
+        v = ymax * i / 4
+        y = PT + PH - PH * i / 4
+        b.append(f'  <line x1="{PL}" y1="{y:.1f}" x2="{W - PR}" y2="{y:.1f}" stroke="{GRID}"/>')
+        b.append(f'  <text x="{PL - 10}" y="{y + 4:.1f}" font-size="11" fill="{INK_MUTED}" text-anchor="end">{yfmt(v)}</text>')
+    for i in range(xticks + 1):
+        v = xmax * i / xticks
+        x = PL + PW * i / xticks
+        anchor = "start" if i == 0 else ("end" if i == xticks else "middle")
+        b.append(f'  <text x="{x:.1f}" y="{PT + PH + 22}" font-size="11" fill="{INK_MUTED}" text-anchor="{anchor}">{xfmt(v)}</text>')
+    b.append(f'  <line x1="{PL}" y1="{PT + PH}" x2="{W - PR}" y2="{PT + PH}" stroke="{AXIS}"/>')
+    return "\n".join(b)
 
 
-def mk_opcounters() -> str:
-    tmax = 120.0
-    ts_w = (
-        [(t, 0.0) for t in range(0, 42, 2)]
-        + [(42, 25.0), (44, 145.0), (46, 208.0)]
-        + [(t, 202.0 + random.uniform(-10, 10)) for t in range(48, 94, 2)]
-        + [(94, 195.0), (96, 85.0), (98, 4.0)]
-        + [(t, 0.0) for t in range(100, 121, 2)]
-    )
-    ts_r = (
-        [(t, 0.0) for t in range(0, 40, 2)]
-        + [(40, 2.0)]
-        + [(t, 22.0 + random.uniform(-3, 4)) for t in range(42, 102, 2)]
-        + [(102, 6.0)]
-        + [(t, 0.0) for t in range(104, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "opcounters", tmax, 0, 240, xlbls,
-        [(ts_w, GREEN, "grad_opcounters_1"), (ts_r, AMBER, "")],
-        unit_fmt="{:.0f}/s",
-    )
-    return build_svg(
-        "opcounters",
-        "Throughput (Opcounters)",
-        [("Write (insert)", "208 ops/s peak", GREEN), ("Read (pull)", "24 ops/s avg", AMBER)],
-        body,
-        subtitle="20 concurrent push sessions + 1 pull consumer",
-    )
+def line(xs, ys, xmax, ymax, color, area=False) -> str:
+    pts = [(PL + PW * x / xmax, PT + PH - PH * min(y, ymax) / ymax) for x, y in zip(xs, ys)]
+    if len(pts) < 2:
+        return ""
+    gap_px = PW * 5 / xmax
+    d = f"M {pts[0][0]:.1f},{pts[0][1]:.1f}"
+    for (px, _), (x, y) in zip(pts, pts[1:]):
+        d += f" {'M' if x - px > gap_px else 'L'} {x:.1f},{y:.1f}"
+    out = ""
+    if area and " M " not in d:
+        out += (f'  <path d="{d} L {pts[-1][0]:.1f},{PT + PH} L {pts[0][0]:.1f},{PT + PH} Z" '
+                f'fill="{color}" fill-opacity="0.06"/>\n')
+    out += (f'  <path d="{d}" fill="none" stroke="{color}" stroke-width="1.75" '
+            f'stroke-linejoin="round" stroke-linecap="round"/>')
+    return out
 
 
-def mk_connections() -> str:
-    tmax = 120.0
-    ts = (
-        [(t, 1.0) for t in range(0, 42, 2)]
-        + [(42, 6.0), (44, 16.0), (46, 21.0)]
-        + [(t, 21.0) for t in range(48, 96, 2)]
-        + [(96, 12.0), (98, 2.0), (100, 1.0)]
-        + [(t, 1.0) for t in range(102, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "connections", tmax, 0, 25, xlbls,
-        [(ts, CYAN, "grad_connections_blue")],
-        unit_fmt="{:.0f}",
-        limit_line=(21, "Peak: 21 / 500 (4.2%)"),
-    )
-    return build_svg(
-        "connections",
-        "Connections",
-        [("# of Connections", "21 / 500", CYAN)],
-        body,
-        subtitle="1 connection per active PyMongo session",
-    )
+def annotate(x, y, xmax, ymax, text, anchor="start") -> str:
+    px = PL + PW * x / xmax
+    py = PT + PH - PH * min(y, ymax) / ymax
+    tx = px + (8 if anchor == "start" else -8)
+    return (f'  <circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="{BG}" stroke="{INK_PRIMARY}" stroke-width="2"/>\n'
+            f'  <text x="{tx:.1f}" y="{py - 8:.1f}" font-size="11" font-weight="500" fill="{INK_SECONDARY}" text-anchor="{anchor}">{text}</text>')
 
 
-def mk_network() -> str:
-    tmax = 120.0
-    ts_in = (
-        [(t, 2.0) for t in range(0, 42, 2)]
-        + [(42, 45.0), (44, 210.0), (46, 285.0)]
-        + [(t, 250.0 + random.uniform(-16, 16)) for t in range(48, 94, 2)]
-        + [(94, 240.0), (96, 95.0), (98, 4.0)]
-        + [(t, 2.0) for t in range(100, 121, 2)]
-    )
-    ts_out = (
-        [(t, 1.0) for t in range(0, 42, 2)]
-        + [(42, 12.0), (44, 42.0), (46, 52.0)]
-        + [(t, 48.0 + random.uniform(-4, 4)) for t in range(48, 96, 2)]
-        + [(96, 18.0), (98, 2.0)]
-        + [(t, 1.0) for t in range(100, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "network", tmax, 0, 320, xlbls,
-        [(ts_in, GREEN, "grad_network_1"), (ts_out, AMBER, "")],
-        unit_fmt="{:.0f} KB/s",
-    )
-    return build_svg(
-        "network",
-        "Network I/O",
-        [("Bytes In", "285 KB/s peak", GREEN), ("Bytes Out", "52 KB/s peak", AMBER)],
-        body,
-        subtitle="Inbound 20-variable payloads vs outbound ACKs and poll reads",
-    )
+def save(name: str, svg: str) -> None:
+    (ASSETS / name).write_text(svg, encoding="utf-8")
+    print(f"[OK] assets/{name}")
 
 
-def mk_oplog() -> str:
-    tmax = 120.0
-    ts = (
-        [(t, 0.0) for t in range(0, 42, 2)]
-        + [(42, 24.0), (44, 148.0), (46, 209.0)]
-        + [(t, 203.0 + random.uniform(-9, 9)) for t in range(48, 94, 2)]
-        + [(94, 198.0), (96, 80.0), (98, 2.0)]
-        + [(t, 0.0) for t in range(100, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "oplog", tmax, 0, 240, xlbls,
-        [(ts, CYAN, "grad_oplog_blue")],
-        unit_fmt="{:.0f}/s",
-        limit_line=(209, "~273 KB/s oplog write rate (reads = 0 entries)"),
-    )
-    return build_svg(
-        "oplog",
-        "Oplog Operations (local.oplog.rs)",
-        [("Oplog Entries", "209 / sec", CYAN)],
-        body,
-        subtitle="1:1 insert replication entries; pull reads add 0 oplog overhead",
-    )
+# ---------------------------------------------------------------- charts
+def run_window(metrics: list[dict]) -> tuple[float, float]:
+    """First and last second with oplog inserts (the active write window)."""
+    active = [m["t"] for m in metrics if m.get("oplog", {}).get("insert", 0) > 0]
+    return (active[0], active[-1]) if active else (0.0, metrics[-1]["t"] if metrics else 0.0)
 
 
-def mk_replication_lag() -> str:
-    tmax = 120.0
-    ts = (
-        [(t, 0.05) for t in range(0, 42, 2)]
-        + [(42, 0.4), (44, 1.8)]
-        + [(44 + i, round(1.8 * math.exp(-i * 0.25) + 0.45 + random.uniform(-0.04, 0.04), 2)) for i in range(2, 18, 2)]
-        + [(t, round(0.48 + random.uniform(-0.06, 0.06), 2)) for t in range(62, 94, 2)]
-        + [(94, 0.45), (96, 0.18), (98, 0.06)]
-        + [(t, 0.05) for t in range(100, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "lag", tmax, 0, 2.0, xlbls,
-        [(ts, AMBER, "grad_lag_amber")],
-        unit_fmt="{:.1f}s",
-        limit_line=(1.8, "Burst peak: 1.8 s -> steady 0.4-0.7 s"),
-    )
-    return build_svg(
-        "lag",
-        "Replication Lag (Secondaries)",
-        [("Replication Lag", "1.8 s peak", AMBER)],
-        body,
-        subtitle="Initial thundering-herd burst settles below 0.7 s within 15 s",
-    )
+def chart_opcounters(m, summary):
+    rows = [r for r in m if "ops" in r]
+    if not rows:
+        return
+    t = [r["t"] for r in rows]
+    ins = [r["ops"]["insert"] for r in rows]
+    rd = [r["ops"]["query"] + r["ops"]["getmore"] for r in rows]
+    ins_s, rd_s = smooth(ins), smooth(rd)
+    xmax, ymax = t[-1], nice_max(max(ins_s + rd_s) * 1.1)
+    a, b = summary["window_start_s"], summary["window_end_s"]
+    steady = [v for tt, v in zip(t, ins) if a + 10 <= tt <= b - 5] or ins
+    summary["opcounters"] = {
+        "insert_peak_1s": max(ins), "insert_peak_5s": round(max(ins_s), 1),
+        "insert_steady_mean": round(statistics.mean(steady), 1),
+        "read_mean_active": round(statistics.mean(
+            [v for tt, v in zip(t, rd) if a <= tt <= b] or [0]), 1),
+    }
+    pk = max(range(len(ins_s)), key=ins_s.__getitem__)
+    body = "\n".join([
+        axes(xmax, ymax, lambda v: fmt_num(v, "/s")),
+        line(t, ins_s, xmax, ymax, S1, area=True),
+        line(t, rd_s, xmax, ymax, S2),
+        annotate(t[pk], ins_s[pk], xmax, ymax, f"peak {ins_s[pk]:.0f} inserts/s",
+                 "end" if t[pk] > xmax * 0.7 else "start"),
+    ])
+    save("graph_opcounters.svg", frame(
+        "Opcounters", f"serverStatus.opcounters, 1 s samples, {SMOOTH} s moving average",
+        [("Insert", f"{summary['opcounters']['insert_steady_mean']:.0f}/s steady", S1),
+         ("Query + getMore", f"{summary['opcounters']['read_mean_active']:.0f}/s", S2)],
+        body, "Insert and read operations per second during the 20-session run"))
 
 
-def mk_query_latency() -> str:
-    tmax = 120.0
-    ts = (
-        [(t, 14.0 + random.uniform(-1.5, 1.5)) for t in range(0, 42, 2)]
-        + [(42, 28.0), (44, 23.0), (46, 18.0)]
-        + [(t, 15.0 + random.uniform(-2.0, 2.0)) for t in range(48, 121, 2)]
-    )
-    xlbls = [(0, "-15m"), (30, "-10m"), (60, "-5m"), (90, "-2m"), (120, "Now")]
-    body = render_series(
-        "latency", tmax, 0, 32, xlbls,
-        [(ts, CYAN, "grad_latency_blue")],
-        unit_fmt="{:.0f} ms",
-        limit_line=(15, "Warm index-cached steady state: 12-18 ms"),
-    )
-    return build_svg(
-        "latency",
-        "Pull Consumer Query Latency",
-        [("Query Time", "15 ms avg", CYAN)],
-        body,
-        subtitle="_id bookmark tail query (1:1 examined/returned ratio)",
-    )
+def chart_connections(m, summary):
+    rows = [r for r in m if "connections" in r]
+    if not rows:
+        return
+    t = [r["t"] for r in rows]
+    c = [r["connections"] for r in rows]
+    base = statistics.median(c[:5]) if len(c) >= 5 else c[0]
+    summary["connections"] = {"baseline": base, "peak": max(c)}
+    xmax, ymax = t[-1], nice_max(max(c) * 1.15)
+    pk = c.index(max(c))
+    body = "\n".join([
+        axes(xmax, ymax, lambda v: fmt_num(v)),
+        line(t, c, xmax, ymax, S2, area=True),
+        annotate(t[pk], c[pk], xmax, ymax, f"peak {max(c)} of 500",
+                 "end" if t[pk] > xmax * 0.7 else "start"),
+    ])
+    save("graph_connections.svg", frame(
+        "Connections", "serverStatus.connections.current on the primary (includes Atlas internal + monitor)",
+        [("Current", f"{base:.0f} → {max(c)}", S2)],
+        body, "Open connections on the primary over the run"))
 
 
-def mk_status_bar() -> str:
-    data = [
-        ("OK", 14043, "70.2%", GREEN),
-        ("WARNING", 2978, "14.9%", AMBER),
-        ("CRITICAL", 2019, "10.1%", RED),
-        ("UNKNOWN", 960, "4.8%", DIM),
-    ]
-    bw, gap = 110, 46
-    chart_w = len(data) * (bw + gap) - gap
-    ox = PL + (PW - chart_w) // 2
-    max_v = 16000
-    b = ""
-
-    for v in yticks(0, max_v, 4):
-        y = sy(v, 0, max_v)
-        b += f'  <line x1="{PL}" y1="{y:.1f}" x2="{W - PR}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>\n'
-        b += f'  <text x="{PL - 10}" y="{y + 3.5:.1f}" font-family="{FONT}" font-size="10.5" fill="{DIM}" text-anchor="end">{int(v):,}</text>\n'
-
-    b += f'  <line x1="{PL}" y1="{PT + PH}" x2="{W - PR}" y2="{PT + PH}" stroke="{AXIS_COL}" stroke-width="1"/>\n'
-
-    for i, (label, count, pct, color) in enumerate(data):
-        x = ox + i * (bw + gap)
-        y = sy(count, 0, max_v)
-        bh = (PT + PH) - y
-        b += f'  <rect x="{x}" y="{y:.1f}" width="{bw}" height="{bh:.1f}" fill="{color}" opacity="0.88" rx="4"/>\n'
-        b += f'  <text x="{x + bw / 2:.1f}" y="{y - 8:.1f}" font-family="{FONT}" font-size="11.5" font-weight="600" fill="{color}" text-anchor="middle">{count:,} ({pct})</text>\n'
-        b += f'  <text x="{x + bw / 2:.1f}" y="{PT + PH + 20}" font-family="{FONT}" font-size="11" font-weight="500" fill="{BRIGHT}" text-anchor="middle">{label}</text>\n'
-
-    return build_svg(
-        "status",
-        "Payload Status Distribution",
-        [("Total Verified", "20,000 docs", GREEN)],
-        b,
-        subtitle="Observed telemetry distribution vs weighted generator targets (< 0.5% delta)",
-    )
+def chart_network(m, summary):
+    rows = [r for r in m if "net_in_kbs" in r]
+    if not rows:
+        return
+    t = [r["t"] for r in rows]
+    i_s = smooth([r["net_in_kbs"] for r in rows])
+    o_s = smooth([r["net_out_kbs"] for r in rows])
+    a, b = summary["window_start_s"], summary["window_end_s"]
+    act_in = [v for tt, v in zip(t, i_s) if a + 10 <= tt <= b - 5] or i_s
+    act_out = [v for tt, v in zip(t, o_s) if a + 10 <= tt <= b - 5] or o_s
+    summary["network"] = {"in_peak_kbs": round(max(i_s), 1), "out_peak_kbs": round(max(o_s), 1),
+                          "in_steady_kbs": round(statistics.mean(act_in), 1),
+                          "out_steady_kbs": round(statistics.mean(act_out), 1)}
+    xmax, ymax = t[-1], nice_max(max(i_s + o_s) * 1.1)
+    body = "\n".join([
+        axes(xmax, ymax, lambda v: fmt_num(v, " KB/s")),
+        line(t, i_s, xmax, ymax, S1, area=True),
+        line(t, o_s, xmax, ymax, S2),
+    ])
+    save("graph_network.svg", frame(
+        "Network", f"serverStatus.network bytesIn / bytesOut, {SMOOTH} s moving average",
+        [("Bytes in", f"{summary['network']['in_steady_kbs']:.0f} KB/s", S1),
+         ("Bytes out", f"{summary['network']['out_steady_kbs']:.0f} KB/s", S2)],
+        body, "Network throughput into and out of the primary"))
 
 
-graphs = {
-    "graph_opcounters.svg": mk_opcounters(),
-    "graph_connections.svg": mk_connections(),
-    "graph_network.svg": mk_network(),
-    "graph_oplog.svg": mk_oplog(),
-    "graph_replication_lag.svg": mk_replication_lag(),
-    "graph_query_latency.svg": mk_query_latency(),
-    "graph_status_dist.svg": mk_status_bar(),
-}
+def chart_oplog(m, summary):
+    replay = load_json("oplog_replay.json")
+    notify = [r["oplog_notify_ms_p50"] for r in m if "oplog_notify_ms_p50" in r]
+    if replay:
+        t = [p["t"] for p in replay["per_second"]]
+        ins = [p["inserts"] for p in replay["per_second"]]
+        source = "change-stream replay of local.oplog.rs from run start"
+        other = sum(v for k, v in replay["op_counts"].items() if k != "insert")
+    elif m:
+        t = [r["t"] for r in m]
+        ins = [r.get("oplog", {}).get("insert", 0) for r in m]
+        source = "live change-stream tail"
+        other = sum(sum(v for k, v in r.get("oplog", {}).items() if k != "insert") for r in m)
+    else:
+        return
+    ins_s = smooth(ins)
+    a, b = summary.get("window_start_s", 0), summary.get("window_end_s", t[-1])
+    steady = [v for tt, v in zip(t, ins) if a + 10 <= tt <= b - 5] or ins
+    summary["oplog"] = {"source": source, "insert_entries_total": sum(ins),
+                        "non_insert_entries": other, "peak_1s": max(ins),
+                        "peak_5s": round(max(ins_s), 1),
+                        "steady_mean_per_s": round(statistics.mean(steady), 1),
+                        "inserts_per_session": replay.get("inserts_per_session") if replay else None,
+                        "live_tail_notify_ms_p50": round(statistics.median(notify), 1) if notify else None}
+    xmax, ymax = t[-1], nice_max(max(ins_s) * 1.15)
+    pk = max(range(len(ins_s)), key=ins_s.__getitem__)
+    body = "\n".join([
+        axes(xmax, ymax, lambda v: fmt_num(v, "/s")),
+        line(t, ins_s, xmax, ymax, S1, area=True),
+        annotate(t[pk], ins_s[pk], xmax, ymax, f"{ins_s[pk]:.0f} entries/s",
+                 "end" if t[pk] > xmax * 0.7 else "start"),
+    ])
+    save("graph_oplog.svg", frame(
+        "Oplog insert entries (event_streaming.sensor_events)",
+        f"{source}, bucketed by clusterTime  ·  {SMOOTH} s moving average",
+        [("op: i", f"{sum(ins):,} entries", S1)],
+        body, "Oplog insert entries per second for the test namespace"))
 
-for fname, content in graphs.items():
-    path = os.path.join("assets", fname)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
-    print(f"[OK] {path}")
+
+def chart_repl_lag(m, summary):
+    rows = [r for r in m if r.get("repl_lag_s")]
+    if not rows:
+        return
+    names = sorted({k for r in rows for k in r["repl_lag_s"]})
+    t_all = [r["t"] for r in m]
+    xmax = t_all[-1]
+    series, peaks = [], {}
+    for name in names:
+        pts = [(r["t"], r["repl_lag_s"][name]) for r in rows if name in r["repl_lag_s"]]
+        series.append((name, pts))
+        peaks[name] = max(v for _, v in pts)
+    allv = [v for _, p in series for _, v in p]
+    summary["replication_lag"] = {
+        "per_secondary_peak_s": {k: round(v, 3) for k, v in peaks.items()},
+        "p50_s": round(pct(allv, 0.5), 3), "p95_s": round(pct(allv, 0.95), 3),
+        "max_s": round(max(allv), 3), "resolution": "lastWriteDate reported in whole seconds, 500 ms heartbeat",
+    }
+    ymax = nice_max(max(max(allv) * 1.15, 1.0))
+    colors = [S1, S2, S3]
+    body = [axes(xmax, ymax, lambda v: fmt_num(v, " s"))]
+    for (name, pts), col in zip(series, colors):
+        body.append(line([p[0] for p in pts], [p[1] for p in pts], xmax, ymax, col))
+    legend = [(n.replace("ac-", "").split("-shard-")[-1].replace("00-", "node "),
+               f"max {peaks[n]:.1f} s", c) for n, c in zip(names, colors)]
+    save("graph_replication_lag.svg", frame(
+        "Replication lag", "Primary − secondary lastWriteDate via 500 ms heartbeats  ·  1 s resolution",
+        legend, "\n".join(body), "Per-secondary replication lag over the run"))
+
+
+def chart_query_latency(polls, summary):
+    rows = [p for p in polls if p["n"] > 0]
+    if not rows:
+        return
+    t = [p["t"] for p in polls]
+    q = [p["query_ms"] for p in polls]
+    q_s = smooth(q, 9)
+    summary["pull_query"] = {"polls": len(polls), "polls_with_docs": len(rows),
+                             "p50_ms": round(pct(q, .5), 1), "p95_ms": round(pct(q, .95), 1),
+                             "p99_ms": round(pct(q, .99), 1), "max_ms": round(max(q), 1),
+                             "docs_per_poll_mean": round(statistics.mean(p["n"] for p in rows), 1)}
+    xmax, ymax = t[-1], nice_max(pct(q, .99) * 1.2)
+    body = "\n".join([
+        axes(xmax, ymax, lambda v: fmt_num(v, " ms")),
+        line(t, q_s, xmax, ymax, S2, area=True),
+    ])
+    save("graph_query_latency.svg", frame(
+        "Pull consumer query time", "find({_id: {$gt: bookmark}}).sort({_id: 1}).limit(100), client round trip, 9-poll moving average",
+        [("p50", f"{summary['pull_query']['p50_ms']:.0f} ms", S2),
+         ("p95", f"{summary['pull_query']['p95_ms']:.0f} ms", INK_MUTED)],
+        body, "Client-observed latency of each pull query"))
+
+    e = [(p["t"], p["e2e_ms_p50"]) for p in polls if p.get("e2e_ms_p50") is not None]
+    if e:
+        ev = [v for _, v in e]
+        summary["end_to_end"] = {"p50_ms": round(pct(ev, .5), 0), "p95_ms": round(pct(ev, .95), 0),
+                                 "max_ms": round(max(p.get("e2e_ms_max") or 0 for p in polls), 0)}
+        ymax = nice_max(pct(ev, .99) * 1.2)
+        es = smooth(ev, 9)
+        body = "\n".join([
+            axes(xmax, ymax, lambda v: fmt_num(v / 1000, " s") if v >= 1000 else fmt_num(v, " ms")),
+            line([x for x, _ in e], es, xmax, ymax, S1, area=True),
+        ])
+        save("graph_end_to_end.svg", frame(
+            "End-to-end delay (push → pull)", "now − pushed_at_epoch for each pulled document, median per poll, 9-poll moving average",
+            [("p50", f"{summary['end_to_end']['p50_ms']:,.0f} ms", S1),
+             ("p95", f"{summary['end_to_end']['p95_ms']:,.0f} ms", INK_MUTED)],
+            body, "Time from a document's creation to the pull consumer reading it"))
+
+
+def chart_sessions(sessions, summary):
+    if not sessions:
+        return
+    sessions = sorted(sessions, key=lambda s: s["session_id"])
+    p50 = [s["insert_ms"]["p50"] for s in sessions]
+    p95 = [s["insert_ms"]["p95"] for s in sessions]
+    ymax = nice_max(max(p95) * 1.15)
+    n = len(sessions)
+    slot = PW / n
+    bw = slot * 0.56
+    b = [axes(n, ymax, lambda v: fmt_num(v, " ms"), xfmt=lambda v: "", xticks=1)]
+    for i, s in enumerate(sessions):
+        x = PL + slot * i + (slot - bw) / 2
+        h50 = PH * p50[i] / ymax
+        y95 = PT + PH - PH * min(p95[i], ymax) / ymax
+        b.append(f'  <path d="M{x:.1f},{PT + PH} V{PT + PH - h50 + 4:.1f} '
+                 f'Q{x:.1f},{PT + PH - h50:.1f} {x + 4:.1f},{PT + PH - h50:.1f} H{x + bw - 4:.1f} '
+                 f'Q{x + bw:.1f},{PT + PH - h50:.1f} {x + bw:.1f},{PT + PH - h50 + 4:.1f} V{PT + PH} Z" fill="{S1}"/>')
+        b.append(f'  <line x1="{x + 2:.1f}" y1="{y95:.1f}" x2="{x + bw - 2:.1f}" y2="{y95:.1f}" '
+                 f'stroke="{S2}" stroke-width="3" stroke-linecap="round"/>')
+        b.append(f'  <text x="{x + bw / 2:.1f}" y="{PT + PH + 22}" font-size="11" fill="{INK_MUTED}" '
+                 f'text-anchor="middle">{s["session_id"]:02d}</text>')
+    allp50 = statistics.median(p50)
+    summary["sessions"] = {
+        "count": n, "success": sum(s["success"] for s in sessions),
+        "failed": sum(s["failed"] for s in sessions),
+        "insert_p50_ms_median": round(allp50, 1),
+        "insert_p50_ms_range": [round(min(p50), 1), round(max(p50), 1)],
+        "insert_p95_ms_range": [round(min(p95), 1), round(max(p95), 1)],
+        "insert_p99_ms_max": round(max(s["insert_ms"]["p99"] for s in sessions), 1),
+        "insert_max_ms": round(max(s["insert_ms"]["max"] for s in sessions), 1),
+        "rate_per_session_mean": round(statistics.mean(s["rate_docs_s"] for s in sessions), 2),
+        "elapsed_s_range": [round(min(s["elapsed_s"] for s in sessions), 1),
+                            round(max(s["elapsed_s"] for s in sessions), 1)],
+        "launch_spread_s": round(max(s["start_epoch"] for s in sessions)
+                                 - min(s["start_epoch"] for s in sessions), 2),
+    }
+    save("graph_session_latency.svg", frame(
+        "insert_one latency by session", "Client round trip per acknowledged insert (w: majority), sessions 01–20",
+        [("p50 (bar)", f"{allp50:.0f} ms median", S1),
+         ("p95 (tick)", f"{statistics.median(p95):.0f} ms median", S2)],
+        "\n".join(b), "Median and 95th percentile insert latency for each of the 20 sessions"))
+
+
+def chart_status(pull, summary):
+    if not pull or not pull.get("status_counts"):
+        return
+    order = [("OK", GOOD, 70), ("WARNING", WARNING, 15), ("CRITICAL", CRITICAL, 10), ("UNKNOWN", NEUTRAL, 5)]
+    counts = pull["status_counts"]
+    total = sum(counts.values())
+    summary["status"] = {k: {"count": counts.get(k, 0),
+                             "pct": round(100 * counts.get(k, 0) / total, 2), "target_pct": tgt}
+                         for k, _, tgt in order}
+    ymax = nice_max(max(counts.values()) * 1.15)
+    n = len(order)
+    slot = PW / n
+    bw = min(120, slot * 0.5)
+    b = [axes(n, ymax, lambda v: fmt_num(v), xfmt=lambda v: "", xticks=1)]
+    for i, (k, col, tgt) in enumerate(order):
+        c = counts.get(k, 0)
+        x = PL + slot * i + (slot - bw) / 2
+        h = PH * c / ymax
+        top = PT + PH - h
+        b.append(f'  <path d="M{x:.1f},{PT + PH} V{top + 4:.1f} Q{x:.1f},{top:.1f} {x + 4:.1f},{top:.1f} '
+                 f'H{x + bw - 4:.1f} Q{x + bw:.1f},{top:.1f} {x + bw:.1f},{top + 4:.1f} V{PT + PH} Z" fill="{col}"/>')
+        b.append(f'  <text x="{x + bw / 2:.1f}" y="{top - 9:.1f}" font-size="12" font-weight="600" '
+                 f'fill="{INK_PRIMARY}" text-anchor="middle">{c:,}  ({100 * c / total:.1f}%)</text>')
+        b.append(f'  <text x="{x + bw / 2:.1f}" y="{PT + PH + 22}" font-size="11.5" font-weight="500" '
+                 f'fill="{INK_SECONDARY}" text-anchor="middle">{k}  ·  target {tgt}%</text>')
+    save("graph_status_dist.svg", frame(
+        "status field distribution", f"Counted by the pull consumer across {total:,} documents",
+        [("Documents", f"{total:,}", NEUTRAL)], "\n".join(b),
+        "Observed status values versus generator weights"))
+
+
+def main() -> None:
+    ASSETS.mkdir(exist_ok=True)
+    # The monitor may have been restarted mid-run: merge all parts by epoch
+    metrics = sorted((r for f in sorted(RES.glob("metrics*.jsonl")) for r in load_jsonl(f.name)),
+                     key=lambda r: r["epoch"])
+    if metrics:
+        e0 = metrics[0]["epoch"]
+        for r in metrics:
+            r["t"] = round(r["epoch"] - e0, 2)
+    polls = load_jsonl("pull_polls.jsonl")
+    pull = load_json("pull_summary.json")
+    sessions = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(RES.glob("session_*.json"))]
+
+    summary: dict = {}
+    global T0_EPOCH
+    if metrics:
+        T0_EPOCH = metrics[0]["epoch"]
+        a, b = run_window(metrics)
+        summary.update(window_start_s=a, window_end_s=b, window_s=round(b - a, 1),
+                       monitor_samples=len(metrics),
+                       serverStatus_available=any("ops" in r for r in metrics),
+                       oplog_error=next((r["oplog_error"] for r in metrics if "oplog_error" in r), None))
+        chart_opcounters(metrics, summary)
+        chart_connections(metrics, summary)
+        chart_network(metrics, summary)
+        chart_oplog(metrics, summary)
+        chart_repl_lag(metrics, summary)
+    chart_query_latency(polls, summary)
+    chart_sessions(sessions, summary)
+    chart_status(pull, summary)
+    if pull:
+        summary["pull"] = {k: pull[k] for k in ("total_pulled", "field_means", "elapsed_s")}
+        summary["pull"]["sessions_complete"] = sum(
+            1 for v in pull.get("unique_sequences_per_session", {}).values()
+            if sessions and v == sessions[0]["total"])
+    (RES / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print("[OK] results/summary.json")
+
+
+if __name__ == "__main__":
+    main()

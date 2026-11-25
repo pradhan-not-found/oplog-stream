@@ -1,0 +1,142 @@
+{
+  "window_start_s": 30.86,
+  "window_end_s": 574.77,
+  "window_s": 543.9,
+  "monitor_samples": 208,
+  "serverStatus_available": true,
+  "oplog_error": "ac-a6wd6qo-shard-00-02.ktnxagq.mongodb.net:27017: [Errno 11001] getaddrinfo failed (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms),ac-a6wd6qo-shard-00-00.ktnxagq.mongodb",
+  "opcounters": {
+    "insert_peak_1s": 89.99,
+    "insert_peak_5s": 63.8,
+    "insert_steady_mean": 45.8,
+    "read_mean_active": 3.9
+  },
+  "connections": {
+    "baseline": 43,
+    "peak": 204
+  },
+  "network": {
+    "in_peak_kbs": 52.0,
+    "out_peak_kbs": 132.1,
+    "in_steady_kbs": 37.7,
+    "out_steady_kbs": 82.2
+  },
+  "oplog": {
+    "source": "change-stream replay of local.oplog.rs from run start",
+    "insert_entries_total": 19978,
+    "non_insert_entries": 0,
+    "peak_1s": 80,
+    "peak_5s": 63.6,
+    "steady_mean_per_s": 36.9,
+    "inserts_per_session": {
+      "1": 999,
+      "10": 999,
+      "11": 999,
+      "12": 999,
+      "13": 999,
+      "14": 999,
+      "15": 998,
+      "16": 999,
+      "17": 999,
+      "18": 999,
+      "19": 999,
+      "2": 999,
+      "20": 999,
+      "3": 999,
+      "4": 999,
+      "5": 999,
+      "6": 999,
+      "7": 998,
+      "8": 999,
+      "9": 999
+    },
+    "live_tail_notify_ms_p50": 906.8
+  },
+  "replication_lag": {
+    "per_secondary_peak_s": {
+      "ac-a6wd6qo-shard-00-00": 12.0,
+      "ac-a6wd6qo-shard-00-02": 24.0
+    },
+    "p50_s": 0.0,
+    "p95_s": 1.0,
+    "max_s": 24.0,
+    "resolution": "lastWriteDate reported in whole seconds, 500 ms heartbeat"
+  },
+  "pull_query": {
+    "polls": 312,
+    "polls_with_docs": 259,
+    "p50_ms": 264.7,
+    "p95_ms": 1529.0,
+    "p99_ms": 21605.5,
+    "max_ms": 104325.1,
+    "docs_per_poll_mean": 61.6
+  },
+  "end_to_end": {
+    "p50_ms": 1048.0,
+    "p95_ms": 39740.0,
+    "max_ms": 106494.0
+  },
+  "sessions": {
+    "count": 20,
+    "success": 19978,
+    "failed": 22,
+    "insert_p50_ms_median": 107.5,
+    "insert_p50_ms_range": [
+      92.8,
+      121.1
+    ],
+    "insert_p95_ms_range": [
+      701.7,
+      820.7
+    ],
+    "insert_p99_ms_max": 5912.5,
+    "insert_max_ms": 26998.9,
+    "rate_per_session_mean": 1.9,
+    "elapsed_s_range": [
+      514.2,
+      543.8
+    ],
+    "launch_spread_s": 2.73
+  },
+  "status": {
+    "OK": {
+      "count": 11095,
+      "pct": 69.59,
+      "target_pct": 70
+    },
+    "WARNING": {
+      "count": 2432,
+      "pct": 15.25,
+      "target_pct": 15
+    },
+    "CRITICAL": {
+      "count": 1620,
+      "pct": 10.16,
+      "target_pct": 10
+    },
+    "UNKNOWN": {
+      "count": 796,
+      "pct": 4.99,
+      "target_pct": 5
+    }
+  },
+  "pull": {
+    "total_pulled": 15943,
+    "field_means": {
+      "temperature": 37.4384,
+      "humidity": 54.7564,
+      "pressure": 1000.1919,
+      "voltage": 4.0068,
+      "current": 1.2767,
+      "cpu_usage": 50.25,
+      "memory_usage": 50.093,
+      "disk_usage": 49.9446,
+      "packet_loss": 5.0352,
+      "latency_ms": 248.7313,
+      "signal_strength": -65.0746,
+      "payload_size_kb": 32.2409
+    },
+    "elapsed_s": 606.01,
+    "sessions_complete": 0
+  }
+}

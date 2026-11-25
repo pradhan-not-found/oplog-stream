@@ -8,11 +8,13 @@ Usage:
     python pull_script.py --batch 100 --interval 1.0
 """
 
+import json
 import os
 import sys
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 from pymongo import MongoClient, DESCENDING, errors
@@ -82,7 +84,8 @@ def build_stats_panel(stats: dict, seen: int) -> Panel:
 # Main pull loop — tail-style using a bookmark cursor
 # ---------------------------------------------------------------------------
 
-def run_pull(collection, batch_size: int, interval: float) -> None:
+def run_pull(collection, batch_size: int, interval: float,
+             until_idle: float = 0.0, record: bool = True) -> None:
     """
     Uses a 'last seen _id' bookmark to fetch only NEW documents
     each polling cycle — mimicking a Change-Stream tail without
@@ -105,6 +108,16 @@ def run_pull(collection, batch_size: int, interval: float) -> None:
         "start_time":   time.time(),
     }
     seen = 0  # running count for running averages
+    fields = ("temperature", "humidity", "pressure", "voltage", "current",
+              "cpu_usage", "memory_usage", "disk_usage", "packet_loss",
+              "latency_ms", "signal_strength", "payload_size_kb")
+    sums = {f: 0.0 for f in fields}
+    seq_seen: dict = defaultdict(set)
+    t0 = time.time()
+    last_doc_at = None
+    results_dir = Path(__file__).parent / "results"
+    results_dir.mkdir(exist_ok=True)
+    poll_log = open(results_dir / "pull_polls.jsonl", "w", encoding="utf-8") if record else None
 
     with Live(build_stats_panel(stats, seen), console=console,
               refresh_per_second=2, screen=False) as live:
@@ -117,9 +130,24 @@ def run_pull(collection, batch_size: int, interval: float) -> None:
                     .sort("_id", 1)
                     .limit(batch_size)
                 )
+                tq = time.perf_counter()
                 docs = list(cursor)
+                query_ms = (time.perf_counter() - tq) * 1000.0
+                now = time.time()
+
+                if poll_log:
+                    e2e = sorted((now - d["pushed_at_epoch"]) * 1000.0
+                                 for d in docs if "pushed_at_epoch" in d)
+                    poll_log.write(json.dumps({
+                        "t": round(now - t0, 3), "epoch": now,
+                        "query_ms": round(query_ms, 2), "n": len(docs),
+                        "e2e_ms_p50": round(e2e[len(e2e) // 2], 1) if e2e else None,
+                        "e2e_ms_max": round(e2e[-1], 1) if e2e else None,
+                    }) + "\n")
+                    poll_log.flush()
 
                 if docs:
+                    last_doc_at = now
                     bookmark = docs[-1]["_id"]
                     for doc in docs:
                         seen += 1
@@ -134,13 +162,40 @@ def run_pull(collection, batch_size: int, interval: float) -> None:
                         stats["avg_lat"] += delta_l / seen
                         delta_c = doc.get("cpu_usage", 0) - stats["avg_cpu"]
                         stats["avg_cpu"] += delta_c / seen
+                        for f in fields:
+                            sums[f] += float(doc.get(f, 0) or 0)
+                        if "session_id" in doc:
+                            seq_seen[doc["session_id"]].add(doc.get("sequence"))
 
                     live.update(build_stats_panel(stats, seen))
 
-                time.sleep(interval)
+                if (until_idle and last_doc_at
+                        and time.time() - last_doc_at >= until_idle):
+                    break
+                # Drain a backlog immediately when a full batch came back
+                if len(docs) < batch_size:
+                    time.sleep(interval)
 
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Pull stopped by user.[/]")
+
+    if poll_log:
+        poll_log.close()
+        total = stats["total"]
+        with open(results_dir / "pull_summary.json", "w", encoding="utf-8") as fh:
+            json.dump({
+                "total_pulled": total,
+                "per_session": {str(k): v for k, v in sorted(
+                    stats["per_session"].items(), key=lambda kv: str(kv[0]))},
+                "unique_sequences_per_session": {
+                    str(k): len(v) for k, v in sorted(seq_seen.items())},
+                "status_counts": dict(stats["status_counts"]),
+                "field_means": {f: round(sums[f] / total, 4) if total else None
+                                for f in fields},
+                "elapsed_s": round(time.time() - t0, 2),
+            }, fh, indent=2)
+        console.print(f"[bold green]Pull summary written -> "
+                      f"{results_dir / 'pull_summary.json'}[/]")
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +208,10 @@ def main() -> None:
     parser.add_argument("--batch",    type=int,   default=int(os.getenv("PULL_BATCH_SIZE", "100")))
     parser.add_argument("--interval", type=float, default=float(os.getenv("PULL_INTERVAL", "1.0")))
     parser.add_argument("--uri",      type=str,   default=os.getenv("MONGO_URI", ""))
+    parser.add_argument("--until-idle", type=float, default=0.0,
+                        help="exit after N s without new documents (0 = run forever)")
+    parser.add_argument("--no-record", action="store_true",
+                        help="do not write results/pull_*.json")
     args = parser.parse_args()
 
     if not args.uri:
@@ -170,7 +229,8 @@ def main() -> None:
     db         = client[os.getenv("DB_NAME", "event_streaming")]
     collection = db[os.getenv("COLLECTION_NAME", "sensor_events")]
 
-    run_pull(collection, args.batch, args.interval)
+    run_pull(collection, args.batch, args.interval,
+             until_idle=args.until_idle, record=not args.no_record)
     client.close()
 
 

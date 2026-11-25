@@ -1,109 +1,88 @@
 """
 generate_banner.py
-Generates a pixel-art SVG banner in the Instrument Sans / mosaic style.
-Run:  python generate_banner.py
-Output: assets/banner.svg
+Renders assets/banner.svg: a light, minimal banner set in Instrument Sans
+(embedded) with a pixel-mosaic arch.
+
+The arch is a grid of squares inside concentric bands; outer bands are dense
+and inner bands dither away, like a stream thinning out as it is consumed.
+If results/run_meta.json exists, a one-line run caption is added.
+
+Run: python generate_banner.py
 """
-import math, random, os
+import json
 
-random.seed(7)
+from pathlib import Path
 
-W, H = 1200, 300
-BG   = "#f9f6f1"
-SQ   = 11          # square size px
-GAP  = 3           # gap between squares
-CELL = SQ + GAP    # 14 px grid
+from mosaic import arch_cells, to_svg
+from svg_theme import style_block
 
-# --- arch centre: bottom-right corner ---
-CX, CY = 1095, H
+ROOT = Path(__file__).parent
+W, H = 1500, 500
+BG = "#FDFCF8"
+INK = "#14201B"
+INK_2 = "#3D4A44"
+INK_3 = "#7C8781"
+MOSAIC = "#9FD9B4"      # soft green
+MOSAIC_DEEP = "#7FC79B"
 
-# MongoDB green palette — inner bright, outer fades
-PALETTE = ["#00ED64", "#00D65A", "#00BE50", "#00A846", "#009040", "#007830"]
 
-rects = []
-for r_idx, r in enumerate(range(55, 310, 28)):
-    n = max(6, int(math.pi * r / CELL))
-    for i in range(n + 1):
-        theta = math.pi * i / n          # 0 → π  (left to right)
-        x = CX - r * math.cos(theta)     # arch opens leftward
-        y = CY - r * math.sin(theta)
+meta_p = ROOT / "results" / "run_meta.json"
+summary_p = ROOT / "results" / "summary.json"
+meta = json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.exists() else {}
+summary = json.loads(summary_p.read_text(encoding="utf-8")) if summary_p.exists() else {}
 
-        if y < -SQ or x < 390 or x > W + SQ:
-            continue
 
-        # dissolve: outer rings get progressively sparse
-        if r > 140:
-            keep_prob = max(0.15, 1.0 - (r - 140) / 240.0)
-            if random.random() > keep_prob:
-                continue
+# Bands: (inner radius, outer radius, density)  - clear gaps between rings
+CX, CY = 1115, 500
+BANDS = [
+    (418, 482, 1.00),
+    (350, 398, 0.94),
+    (292, 330, 0.80),
+    (240, 272, 0.66),
+    (193, 220, 0.52),
+    (150, 173, 0.40),
+    (112, 130, 0.30),
+]
 
-        # add extra scatter dots on outermost rings
-        if r > 220 and random.random() < 0.4:
-            ox = x + random.randint(-18, 18)
-            oy = y + random.randint(-14, 14)
-            if 390 < ox < W and 0 < oy < H:
-                rects.append((ox, oy, PALETTE[-1], 0.25))
 
-        col   = PALETTE[min(r_idx, len(PALETTE) - 1)]
-        alpha = round(max(0.22, 1.0 - (r - 55) / 340.0), 2)
-        rects.append((round(x - SQ / 2, 1), round(y - SQ / 2, 1), col, alpha))
+cells = [c for c in arch_cells(CX, CY, BANDS, CX - 500, W, H, MOSAIC) if c[1] < H]
 
-rect_svg = "\n".join(
-    f'  <rect x="{x}" y="{y}" width="{SQ}" height="{SQ}" '
-    f'fill="{c}" opacity="{a}" rx="1.5"/>'
-    for x, y, c, a in rects
-)
+mosaic = to_svg(cells)
 
-svg = f"""\
-<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+# Pixel glyph: a small database cylinder with a stream arrow (8px grid)
+G = 6
+glyph_map = [
+    "..XXXXXX..",
+    ".X......X.",
+    "X.XXXXXX.X",
+    "X........X",
+    "X.XXXXXX.X",
+    "X........X",
+    ".XXXXXXXX.",
+]
+glyph = "".join(
+    f'<rect x="{50 + c * G}" y="{404 + r * G}" width="{G - 1}" height="{G - 1}" fill="{MOSAIC_DEEP}"/>'
+    for r, row in enumerate(glyph_map) for c, ch in enumerate(row) if ch == "X")
 
-  <!-- background -->
+caption = ""
+if meta and summary.get("sessions"):
+    s = summary["sessions"]
+    caption = (f'<text x="50" y="218" font-size="14" fill="{INK_3}">'
+               f'Measured on MongoDB Atlas M0 · {meta["sessions"]} sessions · '
+               f'{s["success"]:,} documents · {s["failed"]} write errors</text>')
+
+svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="oplog-stream">
+  <title>oplog-stream</title>
+  {style_block()}
   <rect width="{W}" height="{H}" fill="{BG}"/>
-
-  <!-- pixel-art arch -->
-{rect_svg}
-
-  <!-- repo path -->
-  <text x="58" y="52"
-        font-family="'Instrument Sans','Inter',system-ui,sans-serif"
-        font-size="12.5" fill="#999" letter-spacing="0.3">
-    pradhan-not-found / oplog-stream
-  </text>
-
-  <!-- title -->
-  <text x="56" y="128"
-        font-family="'Instrument Sans','Inter',system-ui,sans-serif"
-        font-size="52" font-weight="650" fill="#111" letter-spacing="-1">
-    oplog-stream
-  </text>
-
-  <!-- subtitle line 1 -->
-  <text x="58" y="167"
-        font-family="'Instrument Sans','Inter',system-ui,sans-serif"
-        font-size="15.5" fill="#555" letter-spacing="0.1">
-    High-throughput MongoDB Atlas event streaming pipeline
-  </text>
-
-  <!-- subtitle line 2 -->
-  <text x="58" y="192"
-        font-family="'Instrument Sans','Inter',system-ui,sans-serif"
-        font-size="15.5" fill="#888" letter-spacing="0.1">
-    20 concurrent sessions &#xB7; 20-variable IoT documents &#xB7; real-time pull consumer
-  </text>
-
-  <!-- bottom tag -->
-  <text x="58" y="264"
-        font-family="'Instrument Sans','Inter',system-ui,sans-serif"
-        font-size="13" fill="#00C851" letter-spacing="0.5" font-weight="500">
-    MongoDB Atlas &#x2219; PyMongo &#x2219; Python 3.13
-  </text>
-
+  {mosaic}
+  <text x="50" y="65" font-size="16" fill="{INK_2}">pradhan-not-found / oplog-stream</text>
+  <text x="49" y="135" font-size="30" fill="{INK}">oplog-stream</text>
+  <text x="50" y="163" font-size="17" fill="{INK_2}">20 concurrent producers streaming 20-variable telemetry into MongoDB Atlas,</text>
+  <text x="50" y="187" font-size="17" fill="{INK_2}">tailed in real time by an isolated pull consumer</text>
+  {caption}
+  {glyph}
 </svg>
 """
-
-os.makedirs("assets", exist_ok=True)
-out = os.path.join("assets", "banner.svg")
-with open(out, "w", encoding="utf-8") as f:
-    f.write(svg)
-print(f"Written → {out}  ({len(rects)} squares)")
+(ROOT / "assets" / "banner.svg").write_text(svg, encoding="utf-8")
+print(f"[OK] assets/banner.svg ({len(cells)} cells)")
